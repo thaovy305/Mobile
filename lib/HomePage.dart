@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intelli_pm/Login/LoginPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'WorkItem/EpicDetailPage.dart';
+import 'WorkItem/SubtaskDetailPage.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -71,6 +76,8 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
 
+
+
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -140,20 +147,66 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             SizedBox(height: 24),
-            Text('Recent items',
+            Text('Project List',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
-            _buildRecentSection('TODAY', [
-              _buildRecentItem(Icons.view_kanban, 'SAS board',
-                  'Board - in SEP_Agile_Scrum', 'pink'),
-              _buildRecentItem(Icons.insert_drive_file, 'helloooo', 'SAS-15'),
-            ]),
-            SizedBox(height: 16),
-            _buildRecentSection('YESTERDAY', [
-              _buildRecentItem(Icons.check_box, 'Dat thúi', 'SAS-1'),
-              _buildRecentItem(
-                  Icons.check_box, 'Dat oooooooooooooooooooooooo', 'SAS-20'),
-            ]),
+              _buildRecentItemWithWidgetIcon(
+                SvgPicture.asset(
+                  'assets/type_task.svg',
+                  width: 24,
+                  height: 24,
+                ),
+                'Edit flower product',
+                'FLOWER-7',
+                null,
+                    () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TaskDetailPage(taskId: 'FLOWER-7'),
+                    ),
+                  );
+                },
+              ),
+
+              _buildRecentItemWithWidgetIcon(
+                SvgPicture.asset(
+                  'assets/type_epic.svg',
+                  width: 24,
+                  height: 24,
+                ),
+                'Edit flower product',
+                'FLOWER-1',
+                null,
+                    () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EpicDetailPage(epicId: 'FLOWER-1'),
+                    ),
+                  );
+                },
+              ),
+
+              _buildRecentItemWithWidgetIcon(
+                SvgPicture.asset(
+                  'assets/type_subtask.svg',
+                  width: 24,
+                  height: 24,
+                ),
+                'Edit flower product',
+                'FLOWER-19',
+                null,
+                    () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SubtaskDetailPage(subtaskId: 'FLOWER-19'),
+                    ),
+                  );
+                },
+              ),
+
           ],
         ),
       ),
@@ -203,34 +256,40 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildRecentItem(IconData icon, String title, String subtitle,
-      [String? color]) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _getColor(color),
-              borderRadius: BorderRadius.circular(8),
+  Widget _buildRecentItemWithWidgetIcon(
+      Widget iconWidget, String title, String subtitle,
+      [String? color, VoidCallback? onTap]) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                //color: _getColor(color),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: iconWidget,
             ),
-            child: Icon(icon, size: 20, color: Colors.white),
-          ),
-          SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              Text(subtitle,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            ],
-          )
-        ],
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                Text(subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }

@@ -1,11 +1,14 @@
+import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:intelli_pm/Login/LoginPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'WorkItem/EpicDetailPage.dart';
-import 'WorkItem/SubtaskDetailPage.dart';
+import 'package:intelli_pm/WorkItem/EpicDetailPage.dart';
+import 'package:intelli_pm/WorkItem/SubtaskDetailPage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'BottomNavBar.dart';
+
 
 class HomePage extends StatefulWidget {
   @override
@@ -14,6 +17,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _username = 'User';
+  int _accountId = 0;
+  String _accessToken = '';
 
   @override
   void initState() {
@@ -25,14 +30,16 @@ class _HomePageState extends State<HomePage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _username = prefs.getString('username') ?? 'User';
+      _accessToken = prefs.getString('accessToken') ?? '';
+      _accountId = prefs.getInt('accountId') ?? 0;
     });
   }
 
   void _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('username');
+    await prefs.remove('accessToken');
 
-    // Quay về LoginPage và xóa stack
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginPage()),
           (route) => false,
@@ -65,7 +72,7 @@ class _HomePageState extends State<HomePage> {
             Spacer(),
             PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'logout') _logout(); // 👉 gọi hàm logout
+                if (value == 'logout') _logout();
               },
               itemBuilder: (context) => [
                 PopupMenuItem(value: 'logout', child: Text('Logout')),
@@ -75,9 +82,6 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-
-
-
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -104,8 +108,7 @@ class _HomePageState extends State<HomePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Quick access',
-                    style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 Text('Edit',
                     style: TextStyle(color: Colors.blue, fontSize: 14)),
               ],
@@ -131,8 +134,7 @@ class _HomePageState extends State<HomePage> {
                         SizedBox(height: 4),
                         Text(
                           'Add your most important stuff here, for fast access.',
-                          style:
-                          TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                         ),
                         SizedBox(height: 4),
                         Text('Add items',
@@ -150,95 +152,66 @@ class _HomePageState extends State<HomePage> {
             Text('Project List',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
-              _buildRecentItemWithWidgetIcon(
-                SvgPicture.asset(
-                  'assets/type_task.svg',
-                  width: 24,
-                  height: 24,
-                ),
-                'Edit flower product',
-                'FLOWER-7',
-                null,
-                    () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TaskDetailPage(taskId: 'FLOWER-7'),
-                    ),
-                  );
-                },
+            _buildRecentItemWithWidgetIcon(
+              SvgPicture.asset(
+                'assets/type_task.svg',
+                width: 24,
+                height: 24,
               ),
-
-              _buildRecentItemWithWidgetIcon(
-                SvgPicture.asset(
-                  'assets/type_epic.svg',
-                  width: 24,
-                  height: 24,
-                ),
-                'Edit flower product',
-                'FLOWER-1',
-                null,
-                    () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EpicDetailPage(epicId: 'FLOWER-1'),
-                    ),
-                  );
-                },
+              'Edit flower product',
+              'FLOWER-7',
+              null,
+                  () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TaskDetailPage(taskId: 'FLOWER-7'),
+                  ),
+                );
+              },
+            ),
+            _buildRecentItemWithWidgetIcon(
+              SvgPicture.asset(
+                'assets/type_epic.svg',
+                width: 24,
+                height: 24,
               ),
-
-              _buildRecentItemWithWidgetIcon(
-                SvgPicture.asset(
-                  'assets/type_subtask.svg',
-                  width: 24,
-                  height: 24,
-                ),
-                'Edit flower product',
-                'FLOWER-19',
-                null,
-                    () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SubtaskDetailPage(subtaskId: 'FLOWER-19'),
-                    ),
-                  );
-                },
+              'Edit flower product',
+              'FLOWER-1',
+              null,
+                  () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EpicDetailPage(epicId: 'FLOWER-1'),
+                  ),
+                );
+              },
+            ),
+            _buildRecentItemWithWidgetIcon(
+              SvgPicture.asset(
+                'assets/type_subtask.svg',
+                width: 24,
+                height: 24,
               ),
-
+              'Edit flower product',
+              'FLOWER-19',
+              null,
+                  () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SubtaskDetailPage(subtaskId: 'FLOWER-19'),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: BottomNavBar(
+        username: _username,
         currentIndex: 0,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Projects'),
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'All work'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: 'Dashboards'),
-          BottomNavigationBarItem(
-            icon: Stack(
-              children: [
-                Icon(Icons.notifications),
-                Positioned(
-                  right: 0,
-                  child: CircleAvatar(
-                    radius: 6,
-                    backgroundColor: Colors.red,
-                    child: Text('1',
-                        style: TextStyle(fontSize: 9, color: Colors.white)),
-                  ),
-                )
-              ],
-            ),
-            label: 'Notifications',
-          ),
-        ],
       ),
     );
   }
@@ -248,8 +221,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title,
-            style:
-            TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
         SizedBox(height: 8),
         ...items,
       ],
@@ -273,7 +245,6 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: EdgeInsets.all(6),
               decoration: BoxDecoration(
-                //color: _getColor(color),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: iconWidget,

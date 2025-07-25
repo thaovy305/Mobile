@@ -7,7 +7,7 @@ import '../Helper/UriHelper.dart';
 import '../Login/LoginPage.dart';
 import '../Models/Project.dart';
 import '../Models/Account.dart';
-
+import '../Project/ProjectOverviewPage.dart';
 
 class ProjectListByAccountPage extends StatefulWidget {
   final String username;
@@ -343,7 +343,14 @@ class _ProjectListByAccountPageState extends State<ProjectListByAccountPage> {
                         ),
                       ),
                       onTap: () {
-                        // Add navigation or action for project tap
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProjectOverviewPage(
+                              projectName: project.projectName,
+                            ),
+                          ),
+                        );
                       },
                     ),
                   );

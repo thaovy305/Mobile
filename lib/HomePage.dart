@@ -8,7 +8,6 @@ import '../Login/LoginPage.dart';
 import '../WorkItem/TaskDetailPage.dart';
 import '../WorkItem/EpicDetailPage.dart';
 import '../WorkItem/SubtaskDetailPage.dart';
-import 'BottomNavBar.dart';
 import 'Models/Project.dart';
 import 'Models/Account.dart';
 import 'Models/WorkItem.dart';
@@ -577,10 +576,6 @@ class _HomePageState extends State<HomePage> {
                 ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        username: _fullName ?? _username,
-        currentIndex: 0,
       ),
     );
   }

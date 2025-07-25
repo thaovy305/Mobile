@@ -7,7 +7,7 @@ import '../Helper/UriHelper.dart';
 import '../Login/LoginPage.dart';
 import '../Models/Project.dart';
 import '../Models/Account.dart';
-import '../BottomNavBar.dart';
+
 
 class ProjectListByAccountPage extends StatefulWidget {
   final String username;
@@ -349,10 +349,7 @@ class _ProjectListByAccountPageState extends State<ProjectListByAccountPage> {
                   );
                 },
               ),
-      bottomNavigationBar: BottomNavBar(
-        username: widget.username,
-        currentIndex: 1,
-      ),
+
     );
   }
 }

@@ -9,7 +9,7 @@ import '../Models/Task.dart';
 class SubtaskDetailPage extends StatefulWidget {
   final String subtaskId;
 
-  const SubtaskDetailPage({super.key, required this.subtaskId});
+  const SubtaskDetailPage({Key? key, required this.subtaskId}) : super(key: key);
 
   @override
   State<SubtaskDetailPage> createState() => _TaskDetailPageState();

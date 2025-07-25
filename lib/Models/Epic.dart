@@ -6,12 +6,13 @@ class Epic {
   final DateTime startDate;
   final DateTime endDate;
   String status;
-  final String reporterFullname;
-  final String reporterPicture;
-  final String assignedByFullname;
-  final String assignedByPicture;
-  final String sprintName;
-  final String sprintGoal;
+  final String? reporterFullname;
+  final String? reporterPicture;
+  final String? assignedByFullname;
+  final String? assignedByPicture;
+  final String? sprintName;
+  final int? sprintId;
+  final String? sprintGoal;
 
   Epic({
     required this.id,
@@ -26,6 +27,7 @@ class Epic {
     required this.assignedByFullname,
     required this.assignedByPicture,
     required this.sprintName,
+    required this.sprintId,
     required this.sprintGoal,
   });
 
@@ -44,6 +46,7 @@ class Epic {
       assignedByPicture: json['assignedByPicture'],
       sprintName: json['sprintName'],
       sprintGoal: json['sprintGoal'],
+      sprintId: json['sprintId'],
     );
   }
 }

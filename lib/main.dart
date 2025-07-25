@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'HomePage.dart';
 import 'Login/LoginPage.dart';
 
 void main() {
@@ -30,7 +31,8 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      home: LoginPage(),
+        home: LoginPage(),
+      // home: HomePage(),
     );
   }
 }

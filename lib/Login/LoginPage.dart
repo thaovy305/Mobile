@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:intelli_pm/Helper/UriHelper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../HomePage.dart';
+import 'package:intelli_pm/MainScreen.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -54,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+          MaterialPageRoute(builder: (context) => MainScreen()),
         );
       } else {
         setState(() {

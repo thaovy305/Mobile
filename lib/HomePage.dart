@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
+import 'WorkItem/EpicDetailPage.dart';
+import 'WorkItem/SubtaskDetailPage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../Helper/UriHelper.dart';
+import '../Helper/UriHelper.dart'; // Đảm bảo import UriHelper nếu dùng
 import '../Login/LoginPage.dart';
 import '../WorkItem/TaskDetailPage.dart';
 import '../WorkItem/EpicDetailPage.dart';
@@ -577,6 +580,19 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+
+    );
+  }
+
+  Widget _buildRecentSection(String title, List<Widget> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
+        SizedBox(height: 8),
+        ...items,
+      ],
     );
   }
 

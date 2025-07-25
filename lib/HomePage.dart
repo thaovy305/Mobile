@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intelli_pm/Login/LoginPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'WorkItem/EpicDetailPage.dart';
 import 'WorkItem/SubtaskDetailPage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -243,19 +242,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildRecentSection(String title, List<Widget> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style:
-            TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
-        SizedBox(height: 8),
-        ...items,
-      ],
-    );
-  }
-
   Widget _buildRecentItemWithWidgetIcon(
       Widget iconWidget, String title, String subtitle,
       [String? color, VoidCallback? onTap]) {
@@ -292,14 +278,5 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  Color _getColor(String? color) {
-    switch (color) {
-      case 'pink':
-        return Colors.pinkAccent;
-      default:
-        return Colors.blue;
-    }
   }
 }

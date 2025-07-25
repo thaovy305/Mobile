@@ -5,7 +5,7 @@ class Epic {
   final String description;
   final DateTime startDate;
   final DateTime endDate;
-  final String status;
+  String status;
   final String reporterFullname;
   final String reporterPicture;
   final String assignedByFullname;

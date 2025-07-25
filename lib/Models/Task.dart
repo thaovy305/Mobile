@@ -28,20 +28,19 @@ class Task {
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
-    final data = json['data'];
     return Task(
-      id: data['id'],
-      title: data['title'],
-      description: data['description'],
-      reporterName: data['reporterName'],
-      reporterPicture: data['reporterPicture'],
-      status: data['status'],
-      type: data['type'],
-      sprintName: data['sprintName'],
-      plannedStartDate: data['plannedStartDate'],
-      plannedEndDate: data['plannedEndDate'],
-      createdAt: data['createdAt'],
-      updatedAt: data['updatedAt'],
+      id: json['id'],
+      title: json['title'],
+      description: json['description'],
+      reporterName: json['reporterName'],
+      reporterPicture: json['reporterPicture'],
+      status: json['status'],
+      type: json['type'],
+      sprintName: json['sprintName'],
+      plannedStartDate: json['plannedStartDate'],
+      plannedEndDate: json['plannedEndDate'],
+      createdAt: json['createdAt'],
+      updatedAt: json['updatedAt'],
     );
   }
 }

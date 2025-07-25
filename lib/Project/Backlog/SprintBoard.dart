@@ -1,86 +1,90 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../Helper/UriHelper.dart';
+import '../../Models/Sprint.dart';
 import 'TaskCard.dart';
 
 class SprintBoard extends StatefulWidget {
+  final String projectKey;
+
+  const SprintBoard({Key? key, required this.projectKey}) : super(key: key);
+
   @override
   _SprintBoardState createState() => _SprintBoardState();
 }
 
 class _SprintBoardState extends State<SprintBoard> {
-  final List<Map<String, dynamic>> sprints = [
-    {
-      'id': 1,
-      'name': 'TB Sprint (Active)',
-      'tasks': [
-        {
-          'title': 'bcbcbcv',
-          'code': 'TB-18',
-          'status': 'Done',
-          'epicLabel': 'Đạt Epic',
-          'isDone': true,
-        },
-        {
-          'title': '999999',
-          'code': 'TB-21',
-          'status': 'To Do',
-          'epicLabel': 'epic 1',
-          'isDone': false,
-        },
-        {
-          'title': 'dgggggggg',
-          'code': 'TB-6',
-          'status': 'In Progress',
-          'epicLabel': 'tuấn đạt',
-          'isDone': false,
-        },
-        {
-          'title': 'datastra',
-          'code': 'TB-22',
-          'status': 'To Do',
-          'epicLabel': null,
-          'isDone': false,
-        },
-      ]
-    },
-    {
-      'id': 2,
-      'name': 'TB 3',
-      'tasks': [
-        {
-          'title': 'gdsfgsdfg',
-          'code': 'TB-25',
-          'status': 'To Do',
-          'epicLabel': null,
-          'isDone': false,
-        },
-      ]
-    },
-    {
-      'id': 3,
-      'name': 'TB 4',
-      'tasks': [
-        {
-          'title': 'fsgsdfg',
-          'code': 'TB-26',
-          'status': 'To Do',
-          'epicLabel': null,
-          'isDone': false,
-        },
-      ]
-    },
-  ];
-
+  List<Sprint> sprints = [];
   final Map<int, bool> expandedSprints = {};
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchSprints();
+  }
+
+  Future<void> fetchSprints() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final uri = UriHelper.build('/sprint/by-project-id-with-tasks?projectKey=${widget.projectKey}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          final data = jsonBody['data'] as List;
+          setState(() {
+            sprints = data.map((sprintJson) => Sprint.fromJson(sprintJson)).toList();
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            errorMessage = jsonBody['message'] ?? 'Failed to load sprints';
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          errorMessage = 'Server error: ${response.statusCode}';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Network error: $e';
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (errorMessage != null) {
+      return Center(child: Text(errorMessage!, style: const TextStyle(color: Colors.red)));
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(0),
-
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: sprints.map((sprint) {
-          final sprintId = sprint['id'];
+          final sprintId = sprint.id;
           final isExpanded = expandedSprints[sprintId] ?? true;
 
           return Card(
@@ -93,16 +97,14 @@ class _SprintBoardState extends State<SprintBoard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header with toggle
                   GestureDetector(
                     onTap: () {
                       setState(() {
-                        expandedSprints[sprintId] = !(expandedSprints[sprintId] ?? true);
+                        expandedSprints[sprintId] = !isExpanded;
                       });
                     },
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12.0),
-
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -116,12 +118,12 @@ class _SprintBoardState extends State<SprintBoard> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  sprint['name'],
+                                  sprint.name,
                                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${(sprint['tasks'] as List).length} work items',
+                                  '${sprint.tasks?.length ?? 0} work items',
                                   style: const TextStyle(fontSize: 13, color: Colors.grey),
                                 ),
                               ],
@@ -131,23 +133,18 @@ class _SprintBoardState extends State<SprintBoard> {
                       ),
                     ),
                   ),
-
-
-
                   const SizedBox(height: 8.0),
-
-                  // Tasks
-                  if (isExpanded)
-                    ...List.generate((sprint['tasks'] as List).length, (index) {
-                      final task = sprint['tasks'][index];
+                  if (isExpanded && sprint.tasks != null)
+                    ...List.generate(sprint.tasks!.length, (index) {
+                      final task = sprint.tasks![index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: TaskCard(
-                          title: task['title'],
-                          code: task['code'],
-                          status: task['status'],
-                          epicLabel: task['epicLabel'],
-                          isDone: task['isDone'],
+                          title: task.title,
+                          code: task.id,
+                          status: task.status ?? 'Unknown',
+                          epicLabel: task.epicName,
+                          isDone: task.status?.toUpperCase() == 'DONE',
                         ),
                       );
                     }),

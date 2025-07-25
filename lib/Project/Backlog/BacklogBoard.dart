@@ -1,46 +1,83 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../Helper/UriHelper.dart';
+import '../../Models/Task.dart';
 import 'TaskCard.dart';
 
-class BacklogBoard extends StatelessWidget {
-  BacklogBoard({Key? key}) : super(key: key);
+class BacklogBoard extends StatefulWidget {
+  final String projectKey;
 
-  final List<Map<String, dynamic>> _backlogTasks = [
-    {
-      'id': 1,
-      'title': 'Backlog Task 1',
-      'code': 'BK-001',
-      'status': 'To Do',
-      'epicLabel': 'Epic A',
-      'isDone': false,
-    },
-    {
-      'id': 2,
-      'title': 'Backlog Task 2',
-      'code': 'BK-002',
-      'status': 'In Progress',
-      'epicLabel': 'Epic B',
-      'isDone': false,
-    },
-    {
-      'id': 3,
-      'title': 'Backlog Task 3',
-      'code': 'BK-003',
-      'status': 'Done',
-      'epicLabel': 'Epic A',
-      'isDone': true,
-    },
-    {
-      'id': 4,
-      'title': 'Backlog Task 4',
-      'code': 'BK-004',
-      'status': 'To Do',
-      'epicLabel': 'Epic C',
-      'isDone': false,
-    },
-  ];
+  const BacklogBoard({Key? key, required this.projectKey}) : super(key: key);
+
+  @override
+  _BacklogBoardState createState() => _BacklogBoardState();
+}
+
+class _BacklogBoardState extends State<BacklogBoard> {
+  List<Task> backlogTasks = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchBacklogTasks();
+  }
+
+  Future<void> fetchBacklogTasks() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final uri = UriHelper.build('/task/backlog?projectKey=${widget.projectKey}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          final data = jsonBody['data'] as List;
+          setState(() {
+            backlogTasks = data.map((taskJson) => Task.fromJson(taskJson)).toList();
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            errorMessage = jsonBody['message'] ?? 'Failed to load backlog tasks';
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          errorMessage = 'Server error: ${response.statusCode}';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Network error: $e';
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (errorMessage != null) {
+      return Center(child: Text(errorMessage!, style: const TextStyle(color: Colors.red)));
+    }
+
     return Container(
       padding: const EdgeInsets.all(12.0),
       margin: const EdgeInsets.only(top: 8.0),
@@ -59,17 +96,17 @@ class BacklogBoard extends StatelessWidget {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _backlogTasks.length,
+            itemCount: backlogTasks.length,
             itemBuilder: (context, index) {
-              final task = _backlogTasks[index];
+              final task = backlogTasks[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: TaskCard(
-                  title: task['title'],
-                  code: task['code'],
-                  status: task['status'],
-                  epicLabel: task['epicLabel'],
-                  isDone: task['isDone'] ?? false,
+                  title: task.title,
+                  code: task.id,
+                  status: task.status ?? 'Unknown',
+                  epicLabel: task.epicName,
+                  isDone: task.status?.toUpperCase() == 'DONE',
                 ),
               );
             },

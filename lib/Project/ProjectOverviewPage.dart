@@ -3,8 +3,13 @@ import 'Backlog/BacklogMainPage.dart';
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
+  final String projectKey; // Thêm tham số projectKey
 
-  ProjectOverviewPage({Key? key, required this.projectName}) : super(key: key);
+  ProjectOverviewPage({
+    Key? key,
+    required this.projectName,
+    required this.projectKey,
+  }) : super(key: key);
 
   final List<String> tabs = [
     "Summary",
@@ -49,18 +54,17 @@ class ProjectOverviewPage extends StatelessWidget {
           ),
         ),
         body: TabBarView(
-          children:
-              tabs.map((tab) {
-                if (tab == "Backlog") {
-                  return BacklogMainPage();
-                }
-                return Center(
-                  child: Text(
-                    'Page: $tab',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                );
-              }).toList(),
+          children: tabs.map((tab) {
+            if (tab == "Backlog") {
+              return BacklogMainPage(projectKey: projectKey); // Truyền projectKey
+            }
+            return Center(
+              child: Text(
+                'Page: $tab',
+                style: const TextStyle(fontSize: 18),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );

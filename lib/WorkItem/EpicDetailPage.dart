@@ -478,12 +478,12 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                               Row(
                                 children: [
                                   Expanded(
-                                    flex: toDo,
+                                    flex: done,
                                     child: Container(
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: Colors.grey,
-                                        borderRadius: BorderRadius.horizontal(left: Radius.circular(4)),
+                                        color: Color(0xFF78CC7F),
+                                        borderRadius: BorderRadius.horizontal(right: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
@@ -495,15 +495,16 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                     ),
                                   ),
                                   Expanded(
-                                    flex: done,
+                                    flex: toDo,
                                     child: Container(
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: Color(0xFF78CC7F),
-                                        borderRadius: BorderRadius.horizontal(right: Radius.circular(4)),
+                                        color: Colors.grey,
+                                        borderRadius: BorderRadius.horizontal(left: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
+
                                 ],
                               ),
                             ],
@@ -562,9 +563,9 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundImage: NetworkImage(epicData!.assignedByPicture),
+                  backgroundImage: NetworkImage(epicData!.assignedByPicture ?? ''),
                 ),
-                title: Text(epicData!.assignedByFullname),
+                title: Text(epicData!.assignedByFullname ?? 'Unassigned'),
               ),
             ),
 
@@ -577,15 +578,15 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                   buildDetailRow("Issue Type", "Epic 🟣"),
                   buildDetailRow(
                     "Start Date",
-                    epicData!.startDate.toIso8601String().split("T").first,
+                    epicData!.startDate.toIso8601String().split("T").first ?? 'None',
                   ),
                   buildDetailRow(
                     "End Date",
-                    epicData!.endDate.toIso8601String().split("T").first,
+                    epicData!.endDate.toIso8601String().split("T").first ?? 'None',
                   ),
                   buildDetailRow(
                     "Sprint",
-                    "${epicData!.sprintName} - ${epicData!.sprintGoal}",
+                    epicData!.sprintName ?? 'None',
                   ),
                 ],
               ),
@@ -597,9 +598,9 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundImage: NetworkImage(epicData!.reporterPicture),
+                  backgroundImage: NetworkImage(epicData!.reporterPicture ?? ''),
                 ),
-                title: Text(epicData!.reporterFullname),
+                title: Text(epicData!.reporterFullname ?? 'Unassigned'),
               ),
             ),
 

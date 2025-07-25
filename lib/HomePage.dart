@@ -2,18 +2,15 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
-import 'WorkItem/EpicDetailPage.dart';
-import 'WorkItem/SubtaskDetailPage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../Helper/UriHelper.dart'; // Đảm bảo import UriHelper nếu dùng
+import '../Helper/UriHelper.dart';
 import '../Login/LoginPage.dart';
-import '../WorkItem/TaskDetailPage.dart';
-import '../WorkItem/EpicDetailPage.dart';
-import '../WorkItem/SubtaskDetailPage.dart';
 import 'Models/Project.dart';
 import 'Models/Account.dart';
 import 'Models/WorkItem.dart';
+import 'WorkItem/EpicDetailPage.dart';
+import 'WorkItem/SubtaskDetailPage.dart';
+import 'WorkItem/TaskDetailPage.dart';
 
 
 
@@ -154,8 +151,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final uri = Uri.parse(
-        'https://intellipm-c5c2a5athaa2b9cp.southeastasia-01.azurewebsites.net/api/project/$projectId/workitems',
+      final uri = UriHelper.build('/project/$projectId/workitems',
       );
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('accessToken') ?? '';
@@ -553,7 +549,7 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               );
                             } else if (workItem.type == 'TASK' ||
-                                workItem.type == 'STORY') {
+                                workItem.type == 'STORY' || workItem.type == 'BUG') {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -659,10 +655,13 @@ class _HomePageState extends State<HomePage> {
       case 'EPIC':
         return 'assets/type_epic.svg';
       case 'TASK':
-      case 'STORY':
         return 'assets/type_task.svg';
+      case 'STORY':
+        return 'assets/type_story.svg';
       case 'SUBTASK':
         return 'assets/type_subtask.svg';
+      case 'BUG':
+        return 'assets/type_bug.svg';
       default:
         return 'assets/type_task.svg';
     }

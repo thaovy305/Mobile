@@ -3,6 +3,10 @@ import 'SprintBoard.dart';
 import 'BacklogBoard.dart';
 
 class BacklogMainPage extends StatelessWidget {
+  final String projectKey;
+
+  const BacklogMainPage({Key? key, required this.projectKey}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -10,14 +14,14 @@ class BacklogMainPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Backlog Overview',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            'Backlog Overview - $projectKey',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16.0),
-          SprintBoard(), // Bảng Sprints
+          SprintBoard(projectKey: projectKey),
           const Divider(thickness: 1.0, color: Colors.grey),
-          BacklogBoard(), // Bảng Backlog
+          BacklogBoard(projectKey: projectKey),
         ],
       ),
     );

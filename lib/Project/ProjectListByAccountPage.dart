@@ -348,6 +348,7 @@ class _ProjectListByAccountPageState extends State<ProjectListByAccountPage> {
                           MaterialPageRoute(
                             builder: (context) => ProjectOverviewPage(
                               projectName: project.projectName,
+                              projectKey: project.projectKey,
                             ),
                           ),
                         );

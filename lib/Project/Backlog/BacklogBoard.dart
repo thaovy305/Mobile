@@ -4,7 +4,6 @@ import 'TaskCard.dart';
 class BacklogBoard extends StatelessWidget {
   BacklogBoard({Key? key}) : super(key: key);
 
-  // Dữ liệu tĩnh cho các task trong Backlog
   final List<Map<String, dynamic>> _backlogTasks = [
     {
       'id': 1,
@@ -42,30 +41,41 @@ class BacklogBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Backlog',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8.0),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _backlogTasks.length,
-          itemBuilder: (context, index) {
-            final task = _backlogTasks[index];
-            return TaskCard(
-              title: task['title'],
-              code: task['code'],
-              status: task['status'],
-              epicLabel: task['epicLabel'],
-              isDone: task['isDone'] ?? false,
-            );
-          },
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(12.0),
+      margin: const EdgeInsets.only(top: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Backlog',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8.0),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _backlogTasks.length,
+            itemBuilder: (context, index) {
+              final task = _backlogTasks[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: TaskCard(
+                  title: task['title'],
+                  code: task['code'],
+                  status: task['status'],
+                  epicLabel: task['epicLabel'],
+                  isDone: task['isDone'] ?? false,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

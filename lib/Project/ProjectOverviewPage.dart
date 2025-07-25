@@ -8,8 +8,8 @@ class ProjectOverviewPage extends StatelessWidget {
 
   final List<String> tabs = [
     "Summary",
-    "Board",
     "Backlog",
+    "Board",
     "Calendar",
     "Forms",
     "Timeline",
@@ -42,11 +42,8 @@ class ProjectOverviewPage extends StatelessWidget {
               labelColor: Colors.blue,
               unselectedLabelColor: Colors.grey,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-              // Loại bỏ padding mặc định và điều chỉnh labelPadding
               padding: EdgeInsets.zero,
-              // Xóa padding của TabBar
               labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-              // Đều cho tất cả tab
               tabs: tabs.map((tab) => Tab(text: tab)).toList(),
             ),
           ),

@@ -76,6 +76,7 @@ class _SprintBoardState extends State<SprintBoard> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(0),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: sprints.map((sprint) {
@@ -83,11 +84,12 @@ class _SprintBoardState extends State<SprintBoard> {
           final isExpanded = expandedSprints[sprintId] ?? true;
 
           return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
+            color: Colors.white,
+            margin: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 2,
+            elevation: 0,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -98,17 +100,40 @@ class _SprintBoardState extends State<SprintBoard> {
                         expandedSprints[sprintId] = !(expandedSprints[sprintId] ?? true);
                       });
                     },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          sprint['name'],
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12.0),
+
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  sprint['name'],
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${(sprint['tasks'] as List).length} work items',
+                                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+
+
+
                   const SizedBox(height: 8.0),
 
                   // Tasks

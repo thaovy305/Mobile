@@ -1,10 +1,17 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intelli_pm/Login/LoginPage.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intelli_pm/WorkItem/TaskDetailPage.dart';
 import 'WorkItem/EpicDetailPage.dart';
 import 'WorkItem/SubtaskDetailPage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../Helper/UriHelper.dart'; // Đảm bảo import UriHelper nếu dùng
+import '../Login/LoginPage.dart';
+import '../WorkItem/TaskDetailPage.dart';
+import '../WorkItem/EpicDetailPage.dart';
+import '../WorkItem/SubtaskDetailPage.dart';
+import 'BottomNavBar.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -13,6 +20,11 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _username = 'User';
+  int _accountId = 0;
+  String _accessToken = '';
+  String? _picture;
+  String? _fullName = '';
+  bool _isLoading = false; // Thêm trạng thái loading
 
   @override
   void initState() {
@@ -22,16 +34,73 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? ''; // Lấy email từ SharedPreferences
     setState(() {
       _username = prefs.getString('username') ?? 'User';
+      _accessToken = prefs.getString('accessToken') ?? '';
+      _accountId = prefs.getInt('accountId') ?? 0;
+      _isLoading = email.isNotEmpty; // Bắt đầu loading nếu có email
     });
+    if (email.isNotEmpty) {
+      await _fetchAccountData(email); // Fetch dữ liệu tài khoản nếu có email
+    } else {
+      setState(() {
+        _isLoading = false; // Tắt loading nếu không có email
+      });
+    }
+  }
+
+  Future<void> _fetchAccountData(String email) async {
+    try {
+      final uri = UriHelper.build('/account/$email');
+      print("Fetching account with URI: $uri"); // Log URL
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_accessToken',
+          'Accept': '*/*',
+        },
+      );
+
+      print("Response status: ${response.statusCode}"); // Log status
+      print("Response body: ${response.body}"); // Log body
+
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          final accountData = jsonBody['data'] as Map<String, dynamic>;
+          setState(() {
+            _picture = accountData['picture'] as String?;
+            _fullName = accountData['fullName'] as String?; // Cập nhật _fullName
+            _isLoading = false; // Tắt loading khi fetch thành công
+          });
+        } else {
+          setState(() {
+            _isLoading = false; // Tắt loading nếu isSuccess là false
+          });
+          print("API success is false: ${jsonBody['message']}");
+        }
+      } else {
+        setState(() {
+          _isLoading = false; // Tắt loading nếu status không phải 200
+        });
+        print("API error: ${response.statusCode} - ${response.body}");
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false; // Tắt loading nếu có lỗi
+      });
+      print("Error fetching account data: $e");
+    }
   }
 
   void _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('username');
+    await prefs.remove('accessToken');
+    await prefs.remove('email');
 
-    // Quay về LoginPage và xóa stack
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginPage()),
           (route) => false,
@@ -49,8 +118,23 @@ class _HomePageState extends State<HomePage> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: Colors.blue,
-              child: Icon(Icons.person, color: Colors.white),
+              radius: 16,
+              backgroundColor: _picture != null ? Colors.transparent : Colors.blue,
+              child: _isLoading
+                  ? CircularProgressIndicator(color: Colors.white, strokeWidth: 2) // Loading khi fetch
+                  : (_picture != null
+                  ? ClipOval(
+                child: Image.network(
+                  _picture!,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.person, color: Colors.white);
+                  },
+                ),
+              )
+                  : Icon(Icons.person, color: Colors.white)),
             ),
             SizedBox(width: 8),
             Container(
@@ -59,12 +143,12 @@ class _HomePageState extends State<HomePage> {
                 color: Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text('fpt-tuandatcoder', style: TextStyle(fontSize: 12)),
+              child: Text(_fullName ?? _username, style: TextStyle(fontSize: 12)),
             ),
             Spacer(),
             PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'logout') _logout(); // 👉 gọi hàm logout
+                if (value == 'logout') _logout();
               },
               itemBuilder: (context) => [
                 PopupMenuItem(value: 'logout', child: Text('Logout')),
@@ -82,7 +166,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hello $_username 👋',
+            Text('Hello ${_fullName ?? _username} 👋',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             SizedBox(height: 12),
             TextField(
@@ -130,8 +214,7 @@ class _HomePageState extends State<HomePage> {
                         SizedBox(height: 4),
                         Text(
                           'Add your most important stuff here, for fast access.',
-                          style:
-                          TextStyle(fontSize: 12, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                         ),
                         SizedBox(height: 4),
                         Text('Add items',
@@ -242,6 +325,18 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildRecentSection(String title, List<Widget> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
+        SizedBox(height: 8),
+        ...items,
+      ],
+    );
+  }
+
   Widget _buildRecentItemWithWidgetIcon(
       Widget iconWidget, String title, String subtitle,
       [String? color, VoidCallback? onTap]) {
@@ -278,5 +373,14 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Color _getColor(String? color) {
+    switch (color) {
+      case 'pink':
+        return Colors.pinkAccent;
+      default:
+        return Colors.blue;
+    }
   }
 }

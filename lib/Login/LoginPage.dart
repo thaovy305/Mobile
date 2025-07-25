@@ -42,9 +42,15 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200 && data['isSuccess'] == true) {
         final token = data['data']['accessToken'];
         final username = data['data']['username'];
+        final accountId = data['data']['id'];
+        final email = data['data']['email'];
 
         final prefs = await SharedPreferences.getInstance();
+
         await prefs.setString('username', username);
+        await prefs.setString('accessToken', token);
+        await prefs.setInt('accountId', accountId);
+        await prefs.setString('email', email);
 
         Navigator.pushReplacement(
           context,

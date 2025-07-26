@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+
 import 'TaskAssignment.dart';
 
 class Task {
@@ -12,18 +12,18 @@ class Task {
   final String? epicName;
   final int? sprintId;
   final String? sprintName;
-  final String? type;
+  final String type;
   final bool? manualInput;
   final bool? generationAiInput;
   final String title;
   final String? description;
-  final String? plannedStartDate;
-  final String? plannedEndDate;
+  final DateTime? plannedStartDate;
+  final DateTime? plannedEndDate;
   final String? actualStartDate;
   final String? actualEndDate;
   final String? duration;
   final String? priority;
-  final String? status;
+  String status;
   final String? createdAt;
   final String? updatedAt;
   final List<TaskAssignment>? taskAssignments;
@@ -39,7 +39,7 @@ class Task {
     this.epicName,
     this.sprintId,
     this.sprintName,
-    this.type,
+    required this.type,
     this.manualInput,
     this.generationAiInput,
     required this.title,
@@ -50,7 +50,7 @@ class Task {
     this.actualEndDate,
     this.duration,
     this.priority,
-    this.status,
+    required this.status,
     this.createdAt,
     this.updatedAt,
     this.taskAssignments,
@@ -68,18 +68,18 @@ class Task {
       epicName: json['epicName'] as String?,
       sprintId: json['sprintId'] as int?,
       sprintName: json['sprintName'] as String?,
-      type: json['type'] as String?,
+      type: json['type'] ,
       manualInput: json['manualInput'] as bool?,
       generationAiInput: json['generationAiInput'] as bool?,
       title: json['title'] as String,
       description: json['description'] as String?,
-      plannedStartDate: json['plannedStartDate'] as String?,
-      plannedEndDate: json['plannedEndDate'] as String?,
+      plannedStartDate: json['plannedStartDate'] != null ? DateTime.tryParse(json['plannedStartDate']) : null,
+      plannedEndDate: json['plannedEndDate'] != null ? DateTime.tryParse(json['plannedEndDate']) : null,
       actualStartDate: json['actualStartDate'] as String?,
       actualEndDate: json['actualEndDate'] as String?,
       duration: json['duration'] as String?,
       priority: json['priority'] as String?,
-      status: json['status'] as String?,
+      status: json['status'],
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
       taskAssignments:

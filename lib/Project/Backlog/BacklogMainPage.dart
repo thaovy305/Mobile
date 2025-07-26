@@ -14,13 +14,9 @@ class BacklogMainPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Backlog Overview - $projectKey',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16.0),
+          SizedBox(height: 16.0),
           SprintBoard(projectKey: projectKey),
-          const Divider(thickness: 1.0, color: Colors.grey),
+          Divider(thickness: 1.0, color: Colors.grey.shade200),
           BacklogBoard(projectKey: projectKey),
         ],
       ),

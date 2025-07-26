@@ -92,6 +92,10 @@ class _BacklogBoardState extends State<BacklogBoard> {
             'Backlog',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          Text(
+            '${backlogTasks.length ?? 0} work items',
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
+          ),
           const SizedBox(height: 8.0),
           ListView.builder(
             shrinkWrap: true,
@@ -107,6 +111,9 @@ class _BacklogBoardState extends State<BacklogBoard> {
                   status: task.status ?? 'Unknown',
                   epicLabel: task.epicName,
                   isDone: task.status?.toUpperCase() == 'DONE',
+                  taskAssignments: task.taskAssignments,
+                  type: task.type
+
                 ),
               );
             },

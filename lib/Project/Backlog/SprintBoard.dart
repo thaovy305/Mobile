@@ -6,6 +6,7 @@ import '../../Helper/UriHelper.dart';
 import '../../Models/Sprint.dart';
 import 'TaskCard.dart';
 import 'StartSprintBottomSheet.dart';
+import 'CompleteSprintBottomSheet.dart';
 
 class SprintBoard extends StatefulWidget {
   final String projectKey;
@@ -451,6 +452,33 @@ class _SprintBoardState extends State<SprintBoard> {
     );
   }
 
+  Future<void> _showCompleteSprintBottomSheet(int sprintId, Sprint sprint, int workItemCount) async {
+    final tasks = sprint.tasks ?? [];
+    final workItemCompleted = tasks.where((task) => task.status?.toUpperCase() == 'DONE').length;
+    final workItemOpen = tasks.length - workItemCompleted;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return CompleteSprintBottomSheet(
+          sprintId: sprintId,
+          sprintName: sprint.name ?? 'Unnamed Sprint',
+          projectKey: widget.projectKey,
+          projectId: sprint.projectId,
+          workItem: workItemCount,
+          workItemCompleted: workItemCompleted,
+          workItemOpen: workItemOpen,
+          onTaskUpdated: () async {
+            await fetchSprints();
+            setState(() {});
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -501,7 +529,7 @@ class _SprintBoardState extends State<SprintBoard> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  displayName,
+                                  displayName ?? 'Unnamed Sprint',
                                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
@@ -512,12 +540,25 @@ class _SprintBoardState extends State<SprintBoard> {
                               ],
                             ),
                           ),
-                          PopupMenuButton<String>(
+                          // Hiển thị "Completed" hoặc PopupMenuButton tùy theo trạng thái
+                          sprint.status == 'COMPLETED'
+                              ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            child: Text(
+                              'Completed',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.green,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                              : PopupMenuButton<String>(
                             onSelected: (value) {
                               if (value == 'start' && sprint.status != "ACTIVE") {
                                 _showStartSprintBottomSheet(sprintId, sprint, workItemCount);
                               } else if (value == 'complete' && sprint.status == "ACTIVE") {
-                                print('Complete Sprint: ${sprint.name}');
+                                _showCompleteSprintBottomSheet(sprintId, sprint, workItemCount);
                               } else if (value == 'update') {
                                 _showUpdateSprintDialog(sprintId, sprint, workItemCount);
                               } else if (value == 'delete') {
@@ -579,13 +620,13 @@ class _SprintBoardState extends State<SprintBoard> {
     );
   }
 
-  void _showDeleteConfirmationDialog(int sprintId, String sprintName) {
+  void _showDeleteConfirmationDialog(int sprintId, String? sprintName) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Confirm Deletion'),
-          content: Text('Are you sure you want to delete sprint "$sprintName"? This action cannot be undone.'),
+          content: Text('Are you sure you want to delete sprint "${sprintName ?? 'Unnamed Sprint'}"? This action cannot be undone.'),
           actions: [
             TextButton(
               child: const Text('Cancel'),

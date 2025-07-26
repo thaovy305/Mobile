@@ -16,7 +16,6 @@ class TaskCard extends StatefulWidget {
   final List<TaskAssignment>? taskAssignments;
   final String? type;
 
-
   const TaskCard({
     super.key,
     required this.title,
@@ -26,7 +25,6 @@ class TaskCard extends StatefulWidget {
     this.isDone = false,
     this.taskAssignments,
     this.type,
-
   });
 
   @override
@@ -100,7 +98,6 @@ class _TaskCardState extends State<TaskCard> {
                     ),
                   ),
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,48 +109,40 @@ class _TaskCardState extends State<TaskCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              widget.code,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[700],
-                                decoration: widget.isDone ? TextDecoration.lineThrough : null,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (widget.epicLabel != null)
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.purple.shade100,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  widget.epicLabel!,
-                                  style: const TextStyle(
-                                    color: Colors.purple,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                        ],
+                      Text(
+                        widget.code,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                          decoration: widget.isDone ? TextDecoration.lineThrough : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (widget.epicLabel != null && widget.epicLabel!.isNotEmpty) ...[
+                        const SizedBox(height: 4), // Khoảng cách giữa code và epicLabel
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            widget.epicLabel!,
+                            style: const TextStyle(
+                              color: Colors.purple,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Column(
@@ -166,7 +155,7 @@ class _TaskCardState extends State<TaskCard> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          widget.status.toUpperCase(),
+                          widget.status.toString().toUpperCase(),
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -177,12 +166,11 @@ class _TaskCardState extends State<TaskCard> {
                         ),
                       ),
                       const SizedBox(height: 6),
-
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (widget.taskAssignments != null && widget.taskAssignments!.isNotEmpty)
-                            ...widget.taskAssignments!.take(3).map((assignment) {
+                            ...widget.taskAssignments!.take(2).map((assignment) {
                               return Padding(
                                 padding: const EdgeInsets.only(left: 4.0),
                                 child: CircleAvatar(
@@ -194,14 +182,14 @@ class _TaskCardState extends State<TaskCard> {
                                 ),
                               );
                             }).toList(),
-                          if (widget.taskAssignments != null && widget.taskAssignments!.length > 3)
+                          if (widget.taskAssignments != null && widget.taskAssignments!.length > 2)
                             Padding(
                               padding: const EdgeInsets.only(left: 4.0),
                               child: CircleAvatar(
                                 radius: 10,
                                 backgroundColor: const Color(0xFFB0BEC5),
                                 child: Text(
-                                  '+${widget.taskAssignments!.length - 3}',
+                                  '+${widget.taskAssignments!.length - 2}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.white,
@@ -211,7 +199,6 @@ class _TaskCardState extends State<TaskCard> {
                             ),
                         ],
                       ),
-
                       const Padding(
                         padding: EdgeInsets.only(left: 10),
                         child: Icon(Icons.drag_handle, size: 18, color: Colors.grey),

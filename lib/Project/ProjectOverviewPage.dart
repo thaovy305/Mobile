@@ -3,7 +3,7 @@ import 'Backlog/BacklogMainPage.dart';
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
-  final String projectKey; // Thêm tham số projectKey
+  final String projectKey;
 
   ProjectOverviewPage({
     Key? key,
@@ -12,9 +12,9 @@ class ProjectOverviewPage extends StatelessWidget {
   }) : super(key: key);
 
   final List<String> tabs = [
-    "Summary",
     "Backlog",
     "Board",
+    "Summary",
     "Calendar",
     "Forms",
     "Timeline",

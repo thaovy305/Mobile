@@ -529,7 +529,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _statusColor(task.status ?? ""),
+                              color: _statusColor(task.status ?? ''),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(

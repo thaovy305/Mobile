@@ -102,7 +102,6 @@ class _CommentSectionState extends State<CommentSection> {
                     const SizedBox(height: 4),
                     TextButton.icon(
                       onPressed: () {
-                        // TODO: implement reply
                       },
                       icon: const Icon(Icons.reply, size: 16),
                       label: const Text("Reply"),

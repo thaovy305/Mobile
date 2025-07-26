@@ -3,7 +3,11 @@ class Assignee {
   final String fullname;
   final String? picture;
 
-  Assignee({required this.accountId, required this.fullname, this.picture});
+  Assignee({
+    required this.accountId,
+    required this.fullname,
+    this.picture
+  });
 
   factory Assignee.fromJson(Map<String, dynamic> json) {
     return Assignee(

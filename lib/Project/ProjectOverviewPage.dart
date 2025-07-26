@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'Backlog/BacklogMainPage.dart';
+import 'KanbanBoard/KanbanBoardMain.dart';
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
@@ -56,8 +57,12 @@ class ProjectOverviewPage extends StatelessWidget {
         body: TabBarView(
           children: tabs.map((tab) {
             if (tab == "Backlog") {
-              return BacklogMainPage(projectKey: projectKey); // Truyền projectKey
+              return BacklogMainPage(projectKey: projectKey);
             }
+            if (tab == "Board") {
+              return KanbanBoardMain(projectKey: projectKey);
+            }
+
             return Center(
               child: Text(
                 'Page: $tab',

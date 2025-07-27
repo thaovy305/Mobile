@@ -20,11 +20,19 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
   Map<String, List<Task>> tasksByStatus = {};
   bool isLoading = true;
   String? errorMessage;
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(viewportFraction: 0.85); // Hiển thị 85% cột
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -123,6 +131,28 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
     }
   }
 
+  void _autoScrollToNextPage(DragTargetDetails<String> details) {
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final localPosition = details.offset.dx; // Tọa độ cục bộ trong DragTarget
+    final screenWidth = MediaQuery.of(context).size.width;
+    final visibleWidth = screenWidth * 0.85; // Chiều rộng hiển thị của cột
+    final currentOffset = _pageController.offset; // Vị trí hiện tại của PageView
+    const scrollSpeed = 100.0; // Tốc độ cuộn (pixel)
+
+    print('Local position: $localPosition, screenWidth: $screenWidth, currentOffset: $currentOffset');
+
+    // Cuộn sang phải nếu gần viền phải
+    if (localPosition > visibleWidth * 0.9 && currentOffset < (taskStatuses.length - 1) * visibleWidth) {
+      _pageController.jumpTo(currentOffset + scrollSpeed);
+    }
+    // Cuộn sang trái nếu gần viền trái
+    else if (localPosition < visibleWidth * 0.1 && currentOffset > 0) {
+      _pageController.jumpTo(currentOffset - scrollSpeed);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -144,12 +174,12 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       );
     }
 
-    // Hiển thị tất cả cột từ danh sách trạng thái, kể cả khi không có task
     final columns = taskStatuses.map((status) => KanbanColumn(
       title: status['label'].toString().toUpperCase(),
       statusName: status['name'].toString(),
       tasks: tasksByStatus[status['name']] ?? [],
       onTaskDropped: _updateTaskStatus,
+      onDragUpdate: _autoScrollToNextPage,
     )).toList();
 
     if (columns.isEmpty) {
@@ -157,6 +187,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
     }
 
     return PageView.builder(
+      controller: _pageController,
       scrollDirection: Axis.horizontal,
       itemCount: columns.length,
       itemBuilder: (context, index) => columns[index],

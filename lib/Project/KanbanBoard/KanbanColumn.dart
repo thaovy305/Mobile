@@ -7,6 +7,7 @@ class KanbanColumn extends StatelessWidget {
   final String statusName;
   final List<Task> tasks;
   final Function(String, String) onTaskDropped;
+  final Function(DragTargetDetails<String>) onDragUpdate;
 
   const KanbanColumn({
     super.key,
@@ -14,12 +15,16 @@ class KanbanColumn extends StatelessWidget {
     required this.statusName,
     required this.tasks,
     required this.onTaskDropped,
+    required this.onDragUpdate,
   });
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<String>(
-      onWillAccept: (data) => true, // Cho phép tất cả task được kéo vào
+      onWillAcceptWithDetails: (details) {
+        onDragUpdate(details); // Gọi hàm tự động cuộn khi kéo
+        return true; // Cho phép tất cả task được kéo vào
+      },
       onAccept: (taskId) {
         onTaskDropped(taskId, statusName);
       },

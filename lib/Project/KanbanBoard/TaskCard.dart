@@ -47,48 +47,50 @@ class _TaskCardState extends State<TaskCard> {
     }
   }
 
-  void _enableDragging() {
-    setState(() {
-      _isDraggingEnabled = true;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onLongPress: _enableDragging, // Kích hoạt kéo thả khi giữ lâu
-      child: Draggable<String>(
-        data: _isDraggingEnabled ? widget.task.id : null, // Chỉ kéo khi enabled
-        feedback: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: MediaQuery.of(context).size.width - 64, // Giảm để tránh tràn
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 2,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              widget.task.title,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+    return LongPressDraggable<String>(
+      data: widget.task.id, // Luôn cung cấp data khi kéo
+      delay: const Duration(milliseconds: 1000), // Tăng thời gian giữ lâu lên 1 giây
+      feedback: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: MediaQuery.of(context).size.width - 64, // Giảm để tránh tràn
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 2,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            widget.task.title,
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        childWhenDragging: Opacity(
-          opacity: 0.3,
-          child: _buildCard(context),
-        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.3,
+        child: _buildCard(context),
+      ),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailPage(taskId: widget.task.id),
+            ),
+          );
+        },
         child: _buildCard(context),
       ),
     );

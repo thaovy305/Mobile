@@ -12,7 +12,7 @@
 
     <application
         android:usesCleartextTraffic="true"
-        android:label="intelli_pm"
+        android:label="Intelli PM"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

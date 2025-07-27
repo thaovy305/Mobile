@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'Backlog/BacklogMainPage.dart';
+import 'Dashboard/Dashboard.dart';
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
@@ -19,6 +20,7 @@ class ProjectOverviewPage extends StatelessWidget {
     "Forms",
     "Timeline",
     "Reports",
+    "Dashboard",
   ];
 
   @override
@@ -57,6 +59,8 @@ class ProjectOverviewPage extends StatelessWidget {
           children: tabs.map((tab) {
             if (tab == "Backlog") {
               return BacklogMainPage(projectKey: projectKey); // Truyền projectKey
+            } else if (tab == "Dashboard") {
+              return DashboardPage(projectKey: projectKey);
             }
             return Center(
               child: Text(

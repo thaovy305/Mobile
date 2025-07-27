@@ -44,6 +44,7 @@ dependencies:
   path: ^1.9.1
   file_picker: ^10.2.0
   dio: ^5.8.0+1
+  fl_chart: ^0.64.0
 
 dev_dependencies:
   flutter_test:

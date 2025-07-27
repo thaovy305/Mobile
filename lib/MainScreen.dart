@@ -30,13 +30,19 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  // void _onNavBarTap(int index) {
+  //   if (index == 0 || index == 1) {
+  //     setState(() {
+  //       _currentIndex = index;
+  //     });
+  //   }
+  //   // Các tab khác (2, 3, 4) không làm gì vì chưa có trang
+  // }
+
   void _onNavBarTap(int index) {
-    if (index == 0 || index == 1) {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
-    // Các tab khác (2, 3, 4) không làm gì vì chưa có trang
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -53,7 +59,7 @@ class _MainScreenState extends State<MainScreen> {
                   HomePage(),
                   ProjectListByAccountPage(username: _username),
                   const Center(child: Text('All work - Chưa triển khai')),
-                  const Center(child: Text('Dashboards - Chưa triển khai')),
+                  const Center(child: Text('Dashboard - Chưa triển khai')),
                   const Center(child: Text('Notifications - Chưa triển khai')),
                 ],
               ),

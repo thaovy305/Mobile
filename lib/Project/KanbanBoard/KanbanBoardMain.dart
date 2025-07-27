@@ -18,7 +18,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
   int? activeSprintId;
   List<Map<String, dynamic>> taskStatuses = [];
   Map<String, List<Task>> tasksByStatus = {};
-  bool isLoading = true;
+  Map<String, bool> isLoadingPerStatus = {}; // Thêm trạng thái loading cho từng cột
   String? errorMessage;
   late PageController _pageController;
 
@@ -26,22 +26,34 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.85); // Hiển thị 85% cột
-    _fetchData();
+    _fetchInitialData();
+    _pageController.addListener(_onPageChanged); // Lắng nghe thay đổi trang
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_onPageChanged);
     _pageController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _fetchInitialData() async {
     setState(() {
-      isLoading = true;
+      isLoadingPerStatus.clear();
+      taskStatuses = [];
+      tasksByStatus.clear();
       errorMessage = null;
     });
+    await _fetchDataForStatus(null); // Lấy dữ liệu ban đầu cho tất cả cột
+  }
+
+  Future<void> _fetchDataForStatus(String? statusName) async {
+    if (statusName != null) {
+      setState(() {
+        isLoadingPerStatus[statusName] = true;
+      });
+    }
     try {
-      // Lấy sprint active
       final sprintUri = UriHelper.build('/sprint/active-with-tasks/${widget.projectKey}');
       print('Fetching active sprint: $sprintUri');
       final sprintResponse = await http.get(sprintUri, headers: {'Accept': '*/*'});
@@ -49,7 +61,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       if (sprintResponse.statusCode != 200 || json.decode(sprintResponse.body)['isSuccess'] != true) {
         setState(() {
           errorMessage = 'No active sprint found';
-          isLoading = false;
+          if (statusName != null) isLoadingPerStatus[statusName] = false;
         });
         return;
       }
@@ -59,12 +71,11 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       if (sprintId == null) {
         setState(() {
           errorMessage = 'No active sprint found';
-          isLoading = false;
+          if (statusName != null) isLoadingPerStatus[statusName] = false;
         });
         return;
       }
 
-      // Lấy danh sách trạng thái task
       final statusUri = UriHelper.build('/dynamiccategory/by-category-group?categoryGroup=task_status');
       print('Fetching task statuses: $statusUri');
       final statusResponse = await http.get(statusUri, headers: {'Accept': '*/*'});
@@ -74,19 +85,20 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       }
       final statusData = json.decode(statusResponse.body)['data'] as List;
 
-      // Lấy task cho từng trạng thái
       Map<String, List<Task>> tasksByStatusTemp = {};
       for (var status in statusData) {
         final statusName = status['name'].toString();
-        final taskUri = UriHelper.build('/task/by-sprint-id/$sprintId/task-status?taskStatus=$statusName');
-        print('Fetching tasks for status $statusName: $taskUri');
-        final taskResponse = await http.get(taskUri, headers: {'Accept': '*/*'});
-        print('Task response for $statusName: ${taskResponse.statusCode}, data: ${taskResponse.body}');
-        if (taskResponse.statusCode == 200 && json.decode(taskResponse.body)['isSuccess'] == true) {
-          final tasksData = json.decode(taskResponse.body)['data'] as List;
-          tasksByStatusTemp[statusName] = tasksData.map((task) => Task.fromJson(task)).toList();
-        } else {
-          tasksByStatusTemp[statusName] = [];
+        if (statusName != null && (statusName == statusName || statusName == null)) {
+          final taskUri = UriHelper.build('/task/by-sprint-id/$sprintId/task-status?taskStatus=$statusName');
+          print('Fetching tasks for status $statusName: $taskUri');
+          final taskResponse = await http.get(taskUri, headers: {'Accept': '*/*'});
+          print('Task response for $statusName: ${taskResponse.statusCode}, data: ${taskResponse.body}');
+          if (taskResponse.statusCode == 200 && json.decode(taskResponse.body)['isSuccess'] == true) {
+            final tasksData = json.decode(taskResponse.body)['data'] as List;
+            tasksByStatusTemp[statusName] = tasksData.map((task) => Task.fromJson(task)).toList();
+          } else {
+            tasksByStatusTemp[statusName] = [];
+          }
         }
       }
 
@@ -94,12 +106,12 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
         activeSprintId = sprintId;
         taskStatuses = statusData.cast<Map<String, dynamic>>();
         tasksByStatus = tasksByStatusTemp;
-        isLoading = false;
+        if (statusName != null) isLoadingPerStatus[statusName] = false;
       });
     } catch (e) {
       setState(() {
         errorMessage = 'Error: $e';
-        isLoading = false;
+        if (statusName != null) isLoadingPerStatus[statusName] = false;
       });
     }
   }
@@ -121,8 +133,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       );
       print('Update task response: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode == 200 && json.decode(response.body)['isSuccess'] == true) {
-        // Làm mới toàn bộ dữ liệu sau khi cập nhật
-        await _fetchData();
+        await _fetchDataForStatus(newStatus); // Cập nhật chỉ cột mới
       } else {
         print('Failed to update task status: ${response.body}');
       }
@@ -153,9 +164,19 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
     }
   }
 
+  void _onPageChanged() {
+    final currentPage = (_pageController.page ?? 0).round();
+    if (currentPage >= 0 && currentPage < taskStatuses.length) {
+      final statusName = taskStatuses[currentPage]['name'].toString();
+      if (!tasksByStatus.containsKey(statusName)) {
+        _fetchDataForStatus(statusName);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (taskStatuses.isEmpty && errorMessage == null) {
       return const Center(child: CircularProgressIndicator());
     }
     if (errorMessage != null) {
@@ -166,7 +187,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
             Text('Error: $errorMessage', style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchData,
+              onPressed: _fetchInitialData,
               child: const Text('Retry'),
             ),
           ],
@@ -174,13 +195,17 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       );
     }
 
-    final columns = taskStatuses.map((status) => KanbanColumn(
-      title: status['label'].toString().toUpperCase(),
-      statusName: status['name'].toString(),
-      tasks: tasksByStatus[status['name']] ?? [],
-      onTaskDropped: _updateTaskStatus,
-      onDragUpdate: _autoScrollToNextPage,
-    )).toList();
+    final columns = taskStatuses.map((status) {
+      final statusName = status['name'].toString();
+      return KanbanColumn(
+        title: status['label'].toString().toUpperCase(),
+        statusName: statusName,
+        tasks: tasksByStatus[statusName] ?? [],
+        onTaskDropped: _updateTaskStatus,
+        onDragUpdate: _autoScrollToNextPage,
+        isLoading: isLoadingPerStatus[statusName] ?? false,
+      );
+    }).toList();
 
     if (columns.isEmpty) {
       return const Center(child: Text('No task statuses available'));

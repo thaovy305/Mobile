@@ -8,6 +8,7 @@ class KanbanColumn extends StatelessWidget {
   final List<Task> tasks;
   final Function(String, String) onTaskDropped;
   final Function(DragTargetDetails<String>) onDragUpdate;
+  final bool isLoading;
 
   const KanbanColumn({
     super.key,
@@ -16,6 +17,7 @@ class KanbanColumn extends StatelessWidget {
     required this.tasks,
     required this.onTaskDropped,
     required this.onDragUpdate,
+    this.isLoading = false,
   });
 
   @override
@@ -39,7 +41,9 @@ class KanbanColumn extends StatelessWidget {
             color: candidateData != null ? Colors.grey.shade400 : Colors.grey.shade300,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header
@@ -57,47 +61,49 @@ class KanbanColumn extends StatelessWidget {
 
               // Body + Create button wrapper
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Column(
-                    children: [
-                      // Tasks hoặc rỗng với chiều cao tự động
-                      Expanded(
-                        child: tasks.isNotEmpty
-                            ? ListView.builder(
-                          itemCount: tasks.length,
-                          itemBuilder: (context, index) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: TaskCard(
-                                key: ValueKey(tasks[index].id),
-                                task: tasks[index],
-                              ),
-                            );
-                          },
-                        )
-                            : const SizedBox.shrink(),
-                      ),
+                child: SingleChildScrollView( // Thêm cuộn dọc
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Column(
+                      children: [
+                        // Tasks hoặc rỗng với chiều cao tự động
+                        if (tasks.isNotEmpty)
+                          ListView.builder(
+                            shrinkWrap: true, // Cho phép chiều cao tự động
+                            physics: const NeverScrollableScrollPhysics(), // Ngăn cuộn trong ListView
+                            itemCount: tasks.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: TaskCard(
+                                  key: ValueKey(tasks[index].id),
+                                  task: tasks[index],
+                                ),
+                              );
+                            },
+                          ),
+                        const SizedBox.shrink(), // Khi tasks rỗng
 
-                      // Footer actions (luôn nằm dưới cùng)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
-                            Text(
-                              '+ Create',
-                              style: TextStyle(
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
+                        // Footer actions (luôn nằm dưới cùng)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Text(
+                                '+ Create',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                            Icon(Icons.attachment_outlined, color: Colors.blue, size: 20),
-                          ],
+                              Icon(Icons.attachment_outlined, color: Colors.blue, size: 20),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

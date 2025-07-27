@@ -8,6 +8,8 @@ import '../models/epic.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'CommentSection.dart';
+
 class EpicDetailPage extends StatefulWidget {
   final String epicId;
 
@@ -118,11 +120,11 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildStatusOption("TO_DO", Colors.grey, context),
+          _buildStatusOption("TO_DO", Colors.grey,  context),
           const Divider(),
-          _buildStatusOption("IN_PROGRESS", Colors.blue, context),
+          _buildStatusOption("IN_PROGRESS", Color(0xFF5BA6E3), context),
           const Divider(),
-          _buildStatusOption("DONE", Colors.green, context),
+          _buildStatusOption("DONE", Color(0xFF78CC7F), context),
         ],
       ),
     );
@@ -143,12 +145,12 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
+                color: color,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 status.replaceAll('_', ' '),
-                style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -297,11 +299,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.remove_red_eye_outlined),
-            onPressed: () {},
-          ),
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () {}),
           IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
         ],
       ),
@@ -310,46 +307,45 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  epicData!.name,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                      ),
-                      builder: (context) => _buildStatusSelectorSheet(context),
-                    );
-                  },
-                  icon: const Icon(Icons.arrow_drop_down),
-                  label: Text(
-                    epicData!.status,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+            Text(
+              epicData!.name,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
+            const SizedBox(height: 8), // khoảng cách giữa name và dropdown
+            ElevatedButton.icon(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _statusColor(epicData!.status),
-                  ),
+                  builder: (context) => _buildStatusSelectorSheet(context),
+                );
+              },
+              icon: const Icon(Icons.arrow_drop_down),
+              label: Text(
+                epicData!.status,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-              ],
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _statusColor(epicData!.status),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
             ),
-
             const SizedBox(height: 16),
-
             // Description Card
             buildCard(
               title: "Description",
@@ -441,9 +437,8 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             // Parent
             buildCard(title: "Parent work item", child: const Text("None")),
 
-            // Child work items
             buildCard(
-              title: "Child work items",
+              title: "Task Item",
               badgeCount: _tasks.length,
               onTap: () {
                 setState(() {
@@ -459,8 +454,8 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                       final total = _tasks.length;
                       if (total == 0) return const SizedBox();
 
-                      final done = _tasks.where((t) => t.status == 'DONE').length;
-                      final inProgress = _tasks.where((t) => t.status == 'IN_PROGRESS').length;
+                      final done = _tasks.where((s) => s.status == 'DONE').length;
+                      final inProgress = _tasks.where((s) => s.status == 'IN_PROGRESS').length;
                       final toDo = total - done - inProgress;
 
                       return Column(
@@ -482,8 +477,8 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                     child: Container(
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: Color(0xFF78CC7F),
-                                        borderRadius: BorderRadius.horizontal(right: Radius.circular(4)),
+                                        color: const Color(0xFF78CC7F),
+                                        //borderRadius: const BorderRadius.horizontal(left: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
@@ -491,7 +486,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                     flex: inProgress,
                                     child: Container(
                                       height: 8,
-                                      color: Color(0xFF5BA6E3),
+                                      color: const Color(0xFF5BA6E3),
                                     ),
                                   ),
                                   Expanded(
@@ -500,18 +495,17 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                       height: 8,
                                       decoration: BoxDecoration(
                                         color: Colors.grey,
-                                        borderRadius: BorderRadius.horizontal(left: Radius.circular(4)),
+                                        //borderRadius: const BorderRadius.horizontal(right: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
-
                                 ],
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Progress: ${done}/${total} done",
+                            "Progress: $done/$total done",
                             style: const TextStyle(fontSize: 12, color: Colors.black54),
                           ),
                           const SizedBox(height: 8),
@@ -535,7 +529,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _statusColor(task.status ?? ""),
+                              color: _statusColor(task.status ?? ''),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -561,11 +555,26 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             buildCard(
               title: "Assignee",
               child: ListTile(
-                contentPadding: EdgeInsets.zero,
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
-                  backgroundImage: NetworkImage(epicData!.assignedByPicture ?? ''),
+                  radius: 13,
+                  backgroundImage: (epicData!.assignedByPicture != null && epicData!.assignedByPicture!.isNotEmpty)
+                      ? NetworkImage(epicData!.assignedByPicture!)
+                      : null,
+                  backgroundColor: Colors.blue[100],
+                  child: (epicData!.assignedByPicture == null || epicData!.assignedByPicture!.isEmpty)
+                      ? Text(
+                    (epicData!.assignedByFullname?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(fontSize: 12, color: Colors.black),
+                  )
+                      : null,
                 ),
-                title: Text(epicData!.assignedByFullname ?? 'Unassigned'),
+                title: Text(
+                  epicData!.assignedByFullname ?? 'Unassigned',
+                  style: const TextStyle(fontSize: 14),
+                ),
               ),
             ),
 
@@ -596,16 +605,29 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             buildCard(
               title: "Reporter",
               child: ListTile(
-                contentPadding: EdgeInsets.zero,
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
-                  backgroundImage: NetworkImage(epicData!.reporterPicture ?? ''),
+                  radius: 13,
+                  backgroundImage: (epicData!.reporterPicture != null && epicData!.reporterPicture!.isNotEmpty)
+                      ? NetworkImage(epicData!.reporterPicture!)
+                      : null,
+                  backgroundColor: Colors.grey[300],
+                  child: (epicData!.reporterPicture == null || epicData!.reporterPicture!.isEmpty)
+                      ? Text(
+                    (epicData!.reporterFullname?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(fontSize: 12, color: Colors.black),
+                  )
+                      : null,
                 ),
-                title: Text(epicData!.reporterFullname ?? 'Unassigned'),
+                title: Text(
+                  epicData!.reporterFullname ?? 'Unassigned',
+                  style: const TextStyle(fontSize: 14),
+                ),
               ),
             ),
-
-            // Assignee
-
+            CommentSection()
           ],
         ),
       ),

@@ -1,32 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../../Helper/UriHelper.dart';
 import '../../Models/Task.dart';
 import '../../Models/TaskAssignment.dart';
 import '../../WorkItem/TaskDetailPage.dart';
 
 class TaskCard extends StatefulWidget {
-  final String title;
-  final String code;
-  final String status;
-  final String? epicLabel;
-  final bool isDone;
-  final List<TaskAssignment>? taskAssignments;
-  final String? type;
-  final String? sprintStatus; // Thêm để kiểm tra trạng thái sprint
+  final Task task;
 
   const TaskCard({
     super.key,
-    required this.title,
-    required this.code,
-    required this.status,
-    this.epicLabel,
-    this.isDone = false,
-    this.taskAssignments,
-    this.type,
-    this.sprintStatus, // Thêm tham số này
+    required this.task,
   });
 
   @override
@@ -34,8 +17,10 @@ class TaskCard extends StatefulWidget {
 }
 
 class _TaskCardState extends State<TaskCard> {
+  bool _isDraggingEnabled = false;
+
   String _getIconForWorkItem() {
-    switch (widget.type?.toUpperCase()) {
+    switch (widget.task.type?.toUpperCase()) {
       case 'EPIC':
         return 'assets/type_epic.svg';
       case 'TASK':
@@ -49,12 +34,14 @@ class _TaskCardState extends State<TaskCard> {
     }
   }
 
-  Color _statusColor(String status) {
-    switch (status.toUpperCase()) {
+  Color _statusColor(String? status) {
+    switch (status?.toUpperCase()) {
       case 'DONE':
-        return const Color(0xFF78CC7F);
+        return const Color(0xFFb2da73); // Lấy từ API task_status
       case 'IN_PROGRESS':
-        return const Color(0xFF5BA6E3);
+        return const Color(0xFF87b1e1);
+      case 'TO_DO':
+        return const Color(0xFFdddee1);
       default:
         return Colors.grey;
     }
@@ -62,25 +49,14 @@ class _TaskCardState extends State<TaskCard> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.sprintStatus == 'COMPLETED'
-        ? GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TaskDetailPage(taskId: widget.code),
-          ),
-        );
-      },
-      child: _buildCard(context),
-    )
-        : LongPressDraggable<String>(
-      data: widget.code,
+    return LongPressDraggable<String>(
+      data: widget.task.id, // Luôn cung cấp data khi kéo
+      delay: const Duration(milliseconds: 1000), // Tăng thời gian giữ lâu lên 1 giây
       feedback: Material(
         elevation: 8,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: MediaQuery.of(context).size.width - 64,
+          width: MediaQuery.of(context).size.width - 64, // Giảm để tránh tràn
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -95,7 +71,7 @@ class _TaskCardState extends State<TaskCard> {
             ],
           ),
           child: Text(
-            widget.title,
+            widget.task.title,
             style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -111,7 +87,7 @@ class _TaskCardState extends State<TaskCard> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailPage(taskId: widget.code),
+              builder: (context) => TaskDetailPage(taskId: widget.task.id),
             ),
           );
         },
@@ -140,7 +116,7 @@ class _TaskCardState extends State<TaskCard> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (widget.type != null)
+              if (widget.task.type != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: SvgPicture.asset(
@@ -155,23 +131,25 @@ class _TaskCardState extends State<TaskCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.title,
+                      widget.task.title,
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.code,
+                      widget.task.id,
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.grey[700],
-                        decoration: widget.isDone ? TextDecoration.lineThrough : null,
+                        decoration: widget.task.status?.toUpperCase() == 'DONE'
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (widget.epicLabel != null && widget.epicLabel!.isNotEmpty) ...[
+                    if (widget.task.epicName != null && widget.task.epicName!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Container(
                         constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
@@ -181,7 +159,7 @@ class _TaskCardState extends State<TaskCard> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          widget.epicLabel!,
+                          widget.task.epicName!,
                           style: const TextStyle(
                             color: Colors.purple,
                             fontSize: 12,
@@ -203,11 +181,11 @@ class _TaskCardState extends State<TaskCard> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _statusColor(widget.status),
+                        color: _statusColor(widget.task.status),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        widget.status.toString().toUpperCase(),
+                        widget.task.status?.toUpperCase() ?? 'UNKNOWN',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
@@ -221,8 +199,9 @@ class _TaskCardState extends State<TaskCard> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (widget.taskAssignments != null && widget.taskAssignments!.isNotEmpty)
-                          ...widget.taskAssignments!.take(2).map((assignment) {
+                        if (widget.task.taskAssignments != null &&
+                            widget.task.taskAssignments!.isNotEmpty)
+                          ...widget.task.taskAssignments!.take(2).map((assignment) {
                             return Padding(
                               padding: const EdgeInsets.only(left: 4.0),
                               child: CircleAvatar(
@@ -231,17 +210,24 @@ class _TaskCardState extends State<TaskCard> {
                                 backgroundImage: assignment.accountPicture != null
                                     ? NetworkImage(assignment.accountPicture!)
                                     : null,
+                                child: assignment.accountPicture == null
+                                    ? Text(
+                                  assignment.accountFullname?.substring(0, 1) ?? '?',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                )
+                                    : null,
                               ),
                             );
                           }).toList(),
-                        if (widget.taskAssignments != null && widget.taskAssignments!.length > 2)
+                        if (widget.task.taskAssignments != null &&
+                            widget.task.taskAssignments!.length > 2)
                           Padding(
                             padding: const EdgeInsets.only(left: 4.0),
                             child: CircleAvatar(
                               radius: 10,
                               backgroundColor: const Color(0xFFB0BEC5),
                               child: Text(
-                                '+${widget.taskAssignments!.length - 2}',
+                                '+${widget.task.taskAssignments!.length - 2}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Colors.white,

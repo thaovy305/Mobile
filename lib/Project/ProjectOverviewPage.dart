@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'Backlog/BacklogMainPage.dart';
 import 'Dashboard/Dashboard.dart';
+import 'KanbanBoard/KanbanBoardMain.dart';
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
-  final String projectKey; // Thêm tham số projectKey
+  final String projectKey;
 
   ProjectOverviewPage({
     Key? key,
@@ -13,9 +14,9 @@ class ProjectOverviewPage extends StatelessWidget {
   }) : super(key: key);
 
   final List<String> tabs = [
-    "Summary",
     "Backlog",
     "Board",
+    "Summary",
     "Calendar",
     "Forms",
     "Timeline",
@@ -59,9 +60,14 @@ class ProjectOverviewPage extends StatelessWidget {
           children: tabs.map((tab) {
             if (tab == "Backlog") {
               return BacklogMainPage(projectKey: projectKey); // Truyền projectKey
-            } else if (tab == "Dashboard") {
+            } 
+            if (tab == "Dashboard") {
               return DashboardPage(projectKey: projectKey);
             }
+            if (tab == "Board") {
+              return KanbanBoardMain(projectKey: projectKey);
+            }
+
             return Center(
               child: Text(
                 'Page: $tab',

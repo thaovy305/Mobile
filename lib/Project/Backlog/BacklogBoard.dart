@@ -69,6 +69,40 @@ class _BacklogBoardState extends State<BacklogBoard> {
     }
   }
 
+  Future<void> updateTaskSprint(String taskId, int sprintId) async {
+    final uri = UriHelper.build('/task/$taskId/sprint');
+    try {
+      print('Updating task $taskId to sprint $sprintId: $uri');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Accept': '*/*',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(sprintId),
+      );
+      print('Update task response: ${response.statusCode}, body: ${response.body}');
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          await fetchBacklogTasks(); // Làm mới danh sách Backlog
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update task: ${jsonBody['message']}')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error occurred')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -78,41 +112,53 @@ class _BacklogBoardState extends State<BacklogBoard> {
       return Center(child: Text(errorMessage!, style: const TextStyle(color: Colors.red)));
     }
 
-    return Container(
-      padding: const EdgeInsets.all(12.0),
-      margin: const EdgeInsets.only(top: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Backlog',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return DragTarget<String>(
+      onWillAccept: (_) => true,
+      onAccept: (taskId) => updateTaskSprint(taskId, 0), // Đặt sprintId = 0 cho Backlog
+      builder: (context, candidateData, rejectedData) {
+        return Container(
+          padding: const EdgeInsets.all(12.0),
+          margin: const EdgeInsets.only(top: 8.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 8.0),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: backlogTasks.length,
-            itemBuilder: (context, index) {
-              final task = backlogTasks[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: TaskCard(
-                  title: task.title,
-                  code: task.id,
-                  status: task.status ?? 'Unknown',
-                  epicLabel: task.epicName,
-                  isDone: task.status?.toUpperCase() == 'DONE',
-                ),
-              );
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Backlog',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${backlogTasks.length ?? 0} work items',
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 8.0),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: backlogTasks.length,
+                itemBuilder: (context, index) {
+                  final task = backlogTasks[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: TaskCard(
+                      title: task.title,
+                      code: task.id,
+                      status: task.status ?? 'Unknown',
+                      epicLabel: task.epicName,
+                      isDone: task.status?.toUpperCase() == 'DONE',
+                      taskAssignments: task.taskAssignments,
+                      type: task.type,
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

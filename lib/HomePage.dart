@@ -6,13 +6,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../Helper/UriHelper.dart';
 import '../Login/LoginPage.dart';
 import 'Models/Project.dart';
-import 'Models/Account.dart';
 import 'Models/WorkItem.dart';
 import 'WorkItem/EpicDetailPage.dart';
 import 'WorkItem/SubtaskDetailPage.dart';
 import 'WorkItem/TaskDetailPage.dart';
-
-
 
 class HomePage extends StatefulWidget {
   @override
@@ -580,18 +577,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildRecentSection(String title, List<Widget> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[600])),
-        SizedBox(height: 8),
-        ...items,
-      ],
-    );
-  }
-
   Widget _buildRecentItemWithWidgetIcon(
     Widget iconWidget,
     String title,
@@ -639,15 +624,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  Color _getColor(String? color) {
-    switch (color) {
-      case 'pink':
-        return Colors.pinkAccent;
-      default:
-        return Colors.blue;
-    }
   }
 
   String _getIconForWorkItem(WorkItem workItem) {

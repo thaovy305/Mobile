@@ -627,7 +627,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 ),
               ),
             ),
-            CommentSection()
+            //CommentSection()
           ],
         ),
       ),

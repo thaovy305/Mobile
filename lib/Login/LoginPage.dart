@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:intelli_pm/Helper/UriHelper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../HomePage.dart';
+import 'package:intelli_pm/MainScreen.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -42,13 +43,19 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200 && data['isSuccess'] == true) {
         final token = data['data']['accessToken'];
         final username = data['data']['username'];
+        final accountId = data['data']['id'];
+        final email = data['data']['email'];
 
         final prefs = await SharedPreferences.getInstance();
+
         await prefs.setString('username', username);
+        await prefs.setString('accessToken', token);
+        await prefs.setInt('accountId', accountId);
+        await prefs.setString('email', email);
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+          MaterialPageRoute(builder: (context) => MainScreen()),
         );
       } else {
         setState(() {

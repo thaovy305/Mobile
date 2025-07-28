@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'HomePage.dart';
 import 'Project/ProjectListByAccountPage.dart';
 import 'BottomNavBar.dart';
-
+import 'AllWork/AllWorkMain.dart';
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -60,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
                   HomePage(),
                   ProjectListByAccountPage(username: _username),
                   MeetingPage(),
-                  const Center(child: Text('All work - Chưa triển khai')),
+                  AllWorkMain(),
                   const Center(child: Text('Dashboard - Chưa triển khai')),
                   const Center(child: Text('Notifications - Chưa triển khai')),
                 ],

@@ -12,6 +12,7 @@ import '../Models/Task.dart';
 import '../Models/TaskAssignment.dart';
 import '../Models/TaskFile.dart';
 import 'CommentSection.dart';
+import 'SubtaskDetailPage.dart';
 
 
 class TaskDetailPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class TaskDetailPage extends StatefulWidget {
 
   @override
   State<TaskDetailPage> createState() => _TaskDetailPage();
+
 }
 
 class _TaskDetailPage extends State<TaskDetailPage> {
@@ -34,6 +36,8 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   bool _isSubtaskExpanded = false;
   List<TaskAssignment> taskAssignments = [];
   Epic? epic;
+  bool _isCreatingSubtask = false;
+  TextEditingController _subtaskController = TextEditingController();
 
   @override
   void initState() {
@@ -268,6 +272,41 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     }
   }
 
+  Future<void> createSubtask(BuildContext context, String taskId, String title) async {
+    final prefs = await SharedPreferences.getInstance();
+    final accountId = prefs.getInt('accountId');
+
+    if (accountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy AccountId')),
+      );
+      return;
+    }
+
+    final url = UriHelper.build('/subtask/create2');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+      },
+      body: jsonEncode(
+        Subtask(taskId: taskId, title: title, createdBy: accountId).toJson(),
+      ),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print('Created successfully');
+    } else {
+      print('Create failed: ${response.body}');
+      throw Exception('Failed to create subtask');
+    }
+  }
+
+  final GlobalKey _subtaskKey = GlobalKey(); // đặt ngoài build
+  final ScrollController _scrollController = ScrollController(); // để cuộn
+
   Widget buildSectionTitle(String title) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
     child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -376,7 +415,35 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'subtask') {
+                // Cuộn đến Subtask section
+                Scrollable.ensureVisible(
+                  _subtaskKey.currentContext!,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                );
+                setState(() {
+                  _isSubtaskExpanded = true;
+                  _isCreatingSubtask = true; // mở ô nhập luôn nếu muốn
+                });
+              } else if (value == 'attachment') {
+                // Xử lý tạo attachment tại đây
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'subtask',
+                child: Text('Create subtask'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'attachment',
+                child: Text('Create attachment'),
+              ),
+            ],
+            icon: const Icon(Icons.more_vert),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -538,7 +605,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
             buildCard(
               title: "Parent Work Item",
               onTap: () {
-                // Mở popup hoặc điều hướng nếu muốn
+
               },
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -580,7 +647,14 @@ class _TaskDetailPage extends State<TaskDetailPage> {
               ),
             ),
 
-            buildCard(
+    SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(
+    children: [
+    // ... các phần khác
+    Container(
+    key: _subtaskKey, // GẮN key ở đây
+    child:buildCard(
               title: "Subtask List",
               badgeCount: subtasks.length,
               onTap: () {
@@ -650,6 +724,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                             "Progress: $done/$total done",
                             style: const TextStyle(fontSize: 12, color: Colors.black54),
                           ),
+
                           const SizedBox(height: 8),
                         ],
                       );
@@ -666,29 +741,65 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                           visualDensity: VisualDensity.compact,
                           contentPadding: const EdgeInsets.symmetric(vertical: 4),
                           leading: SvgPicture.asset('assets/type_subtask.svg', width: 18, height: 18),
-                          title: Text(subtask.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          subtitle: Text(subtask.id, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          title: Text(subtask.title ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          subtitle: Text(subtask.id?? '', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _statusColor(subtask.status),
+                              color: _statusColor(subtask.status ?? ''),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              subtask.status,
+                              subtask.status ?? '',
                               style: const TextStyle(fontSize: 11),
                             ),
                           ),
-                          onTap: () {
-                            // ✅ Optional: Navigate to subtask detail page
-                            // Navigator.push(context, MaterialPageRoute(builder: (_) => SubtaskDetailPage(...)));
-                          },
-                        ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => SubtaskDetailPage(subtaskId: subtask.id ?? ''),
+                                  ),
+                                );
+                              },
+                            ),
                       ),
                       const SizedBox(height: 8),
-                      OutlinedButton.icon(
+
+                      _isCreatingSubtask
+                          ? Row(
+                        children: [
+                          SvgPicture.asset('assets/type_subtask.svg', width: 18, height: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _subtaskController,
+                              decoration: const InputDecoration(
+                                hintText: 'Add a subtask',
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (value) async {
+                                try {
+                                  await createSubtask(context, widget.taskId, value);
+                                  setState(() {
+                                    _isCreatingSubtask = false;
+                                    _subtaskController.clear();
+                                    fetchSubtasks(); // nếu có function load lại subtasks
+                                  });
+                                } catch (e) {
+                                  print('Lỗi tạo subtask: $e');
+                                }
+                              },
+
+                            ),
+                          ),
+                        ],
+                      )
+                          : OutlinedButton.icon(
                         onPressed: () {
-                          // ✅ Optional: Navigate to Create Subtask
+                          setState(() {
+                            _isCreatingSubtask = true;
+                          });
                         },
                         icon: const Icon(Icons.add),
                         label: const Text("Create subtask"),
@@ -699,6 +810,10 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ],
               ),
             ),
+    ),
+    ],
+    ),
+    ),
 
             buildCard(
               title: "Assignee",
@@ -776,8 +891,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ),
               ),
             ),
-            CommentSection()
-
+            CommentSection(taskId: task!.id ?? ''),
           ],
         ),
       ),

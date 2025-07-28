@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intelli_pm/Meeting/MeetingPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'HomePage.dart';
 import 'Project/ProjectListByAccountPage.dart';
@@ -58,6 +59,7 @@ class _MainScreenState extends State<MainScreen> {
                 children: [
                   HomePage(),
                   ProjectListByAccountPage(username: _username),
+                  MeetingPage(),
                   const Center(child: Text('All work - Chưa triển khai')),
                   const Center(child: Text('Dashboard - Chưa triển khai')),
                   const Center(child: Text('Notifications - Chưa triển khai')),

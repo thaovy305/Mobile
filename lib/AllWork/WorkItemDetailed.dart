@@ -131,18 +131,21 @@ class _WorkItemDetailedState extends State<WorkItemDetailed> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(
+        backgroundColor: Color(0xFFF5F6F8),
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (errorMessage != null) {
       return Scaffold(
+        backgroundColor: const Color(0xFFF5F6F8),
         body: Center(child: Text(errorMessage!)),
       );
     }
 
     if (workItems.isEmpty) {
       return const Scaffold(
+        backgroundColor: Color(0xFFF5F6F8),
         body: Center(child: Text('No work items found')),
       );
     }
@@ -150,6 +153,7 @@ class _WorkItemDetailedState extends State<WorkItemDetailed> {
     final groupedItems = groupWorkItemsByTimePeriod();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),

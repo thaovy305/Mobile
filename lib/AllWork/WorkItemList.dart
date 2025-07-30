@@ -108,6 +108,7 @@ class _WorkItemListState extends State<WorkItemList> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFF5F6F8),
       body: SafeArea(
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -194,7 +195,7 @@ class _WorkItemListState extends State<WorkItemList> {
             // Work items list
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 0, top: 0), // Removed top padding
+                padding: const EdgeInsets.only(bottom: 0, top: 0),
                 itemCount: workItems.length,
                 itemBuilder: (context, index) {
                   final item = workItems[index];

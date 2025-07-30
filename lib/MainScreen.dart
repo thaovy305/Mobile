@@ -59,9 +59,10 @@ class _MainScreenState extends State<MainScreen> {
                 children: [
                   HomePage(),
                   ProjectListByAccountPage(username: _username),
-                  MeetingPage(),
+
                   AllWorkMain(),
-                  const Center(child: Text('Dashboard - Chưa triển khai')),
+                  MeetingPage(),
+                  // const Center(child: Text('Dashboard - Chưa triển khai')),
                   const Center(child: Text('Notifications - Chưa triển khai')),
                 ],
               ),

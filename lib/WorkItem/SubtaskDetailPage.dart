@@ -36,7 +36,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   Future<void> loadData() async {
     await fetchSubtaskDetail();
     if (subtask != null) {
-      await fetchTaskDetail(subtask!.taskId);
+      await fetchTaskDetail(subtask!.taskId ?? '');
     }
     setState(() {
       isLoading = false;
@@ -310,7 +310,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
           children: [
             SvgPicture.asset('assets/type_subtask.svg', width: 20, height: 20),
             const SizedBox(width: 8),
-            Text(subtask!.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(subtask!.id ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
         actions: [
@@ -362,7 +362,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                   },
                   icon: const Icon(Icons.arrow_drop_down),
                   label: Text(
-                    subtask!.status ,
+                    subtask!.status ?? '' ,
                     style: const TextStyle(color: Colors.black),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -489,7 +489,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           Text(
-                            subtask!.taskId,
+                            subtask!.taskId ?? '',
                             style: const TextStyle(color: Colors.black, fontSize: 9),
                           ),
                         ],
@@ -583,7 +583,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 ),
               ),
             ),
-            CommentSection()
+            //CommentSection()
 
           ],
         ),

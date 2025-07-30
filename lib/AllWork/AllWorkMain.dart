@@ -20,11 +20,11 @@ class _AllWorkMainState extends State<AllWorkMain> {
   Widget _getCurrentView() {
     switch (_selectedView) {
       case ViewType.list:
-        return const WorkItemList();
+        return  WorkItemList();
       case ViewType.detailed:
         return const WorkItemDetailed();
       default:
-        return const WorkItemList(); // Default to list view
+        return  WorkItemList();
     }
   }
 
@@ -44,12 +44,10 @@ class _AllWorkMainState extends State<AllWorkMain> {
                 ButtonSegment<ViewType>(
                   value: ViewType.list,
                   label: Text('List'),
-                  icon: Icon(Icons.list),
                 ),
                 ButtonSegment<ViewType>(
                   value: ViewType.detailed,
                   label: Text('Detailed'),
-                  icon: Icon(Icons.details),
                 ),
               ],
               selected: {_selectedView},

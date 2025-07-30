@@ -36,63 +36,65 @@ class WorkItemCardList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0), // Reduced vertical padding
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade100),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              )
-            ],
+            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            borderRadius: BorderRadius.circular(8.0), // Added rounded corners
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          child: Row(
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(2), // Issue column
+              1: FlexColumnWidth(1), // Key column
+            },
+            border: TableBorder(
+              verticalInside: BorderSide(color: Colors.grey.shade300),
+            ),
             children: [
-              // Left column: icon + title
-              Expanded(
-                child: Row(
-                  children: [
-                    SvgPicture.asset(
-                      getIconAsset(),
-                      width: 20,
-                      height: 20,
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              TableRow(
+                children: [
+                  // Issue column with icon and title (aligned left)
+                  Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset(
+                          getIconAsset(),
+                          width: 20,
+                          height: 20,
 
-              // Vertical Divider
-              Container(
-                width: 1,
-                height: 24,
-                color: Colors.grey.shade300,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-              ),
-
-              // Right column: key
-              Text(
-                id,
-                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Key column (aligned right)
+                  Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Text(
+                      id,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

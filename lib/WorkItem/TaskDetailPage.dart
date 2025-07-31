@@ -97,7 +97,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
             isLoading = false;
           });
 
-          // ✅ Sau khi task đã load xong, mới fetch epic
           if (task?.epicId != null && task!.epicId!.isNotEmpty) {
             await fetchEpicData(task!.epicId!);
           }
@@ -810,9 +809,9 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ],
               ),
             ),
-    ),
-    ],
-    ),
+          ),
+        ],
+      ),
     ),
 
             buildCard(

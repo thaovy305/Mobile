@@ -8,7 +8,8 @@ import '../models/epic.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'CommentSection.dart';
+import 'EpicCommentSection.dart';
+import 'TaskDetailPage.dart';
 
 class EpicDetailPage extends StatefulWidget {
   final String epicId;
@@ -133,8 +134,8 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   Widget _buildStatusOption(String status, Color color, BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).pop(); // Đóng bottom sheet
-        updateEpicStatus(status); // Gọi hàm update API
+        Navigator.of(context).pop();
+        updateEpicStatus(status);
       },
       child: Container(
         width: double.infinity,
@@ -520,6 +521,14 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                     children: [
                       ..._tasks.map(
                             (task) => ListTile(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TaskDetailPage(taskId: task.id),
+                              ),
+                            );
+                          },
                           dense: true,
                           visualDensity: VisualDensity.compact,
                           contentPadding: EdgeInsets.symmetric(vertical: 4),
@@ -539,6 +548,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
                         onPressed: () {},
@@ -627,7 +637,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 ),
               ),
             ),
-            //CommentSection()
+            EpicCommentSection(epicId: epicData?.id ?? ''),
           ],
         ),
       ),

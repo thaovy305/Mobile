@@ -8,7 +8,7 @@ import '../Helper/UriHelper.dart';
 import '../Models/Subtask.dart';
 import '../Models/SubtaskFile.dart';
 import '../Models/Task.dart';
-import 'CommentSection.dart';
+import 'SubtaskCommentSection.dart';
 
 class SubtaskDetailPage extends StatefulWidget {
   final String subtaskId;
@@ -583,8 +583,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 ),
               ),
             ),
-            //CommentSection()
-
+            SubtaskCommentSection(subtaskId: subtask?.id ?? '')
           ],
         ),
       ),

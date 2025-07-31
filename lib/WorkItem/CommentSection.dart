@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Helper/UriHelper.dart';
@@ -27,13 +26,15 @@ class _CommentSectionState extends State<CommentSection> {
   int? editingCommentId;
   TextEditingController editController = TextEditingController();
   bool isOldestFirst = true;
-  List<dynamic> activityLogs = [];
+  List<ActivityLog> activityLogs = [];
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     fetchComments();
     fetchCurrentUserId();
+    fetchActivityLogs();
   }
 
   Future<void> fetchComments() async {
@@ -55,11 +56,11 @@ class _CommentSectionState extends State<CommentSection> {
         });
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lấy bình luận thất bại: ${response.statusCode}'),
-        ),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Failed to fetch comment: ${response.statusCode}'),
+      //   ),
+      // );
     }
   }
 
@@ -88,12 +89,12 @@ class _CommentSectionState extends State<CommentSection> {
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       commentInput = '';
+      print("Created successfully");
       await fetchComments();
+      await fetchActivityLogs();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gửi bình luận thất bại: ${response.statusCode}'),
-        ),
+        SnackBar(content: Text('Comment failed: ${response.statusCode}')),
       );
     }
   }
@@ -111,6 +112,7 @@ class _CommentSectionState extends State<CommentSection> {
       if (json['isSuccess'] == true) {
         print("Delete successfully");
         await fetchComments();
+        await fetchActivityLogs();
       } else {
         print("Delete failed: ${json['message']}");
       }
@@ -143,6 +145,8 @@ class _CommentSectionState extends State<CommentSection> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Updated comment')));
+      await fetchComments();
+      await fetchActivityLogs();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Updated error: ${response.statusCode}')),
@@ -150,25 +154,21 @@ class _CommentSectionState extends State<CommentSection> {
     }
   }
 
-  Future<void> fetchActivityLog() async {
-    final url = UriHelper.build('/activitylog/task/${widget.taskId}'); // Sửa lại URL
-    final response = await http.get(Uri.parse(url as String), headers: {'accept': '*/*'});
-
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonMap = jsonDecode(response.body);
-      if (jsonMap['isSuccess']) {
+  Future<void> fetchActivityLogs() async {
+    final uri = UriHelper.build('/activitylog/task/${widget.taskId}');
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        final List<dynamic> data = jsonData['data'];
         setState(() {
-          activityLogs = jsonMap['data'];
+          activityLogs = data.map((e) => ActivityLog.fromJson(e)).toList();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lấy hoạt động thất bại: ${jsonMap['message']}')),
-        );
+        print('Error: ${response.statusCode}');
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lấy hoạt động thất bại: ${response.statusCode}')),
-      );
+    } catch (e) {
+      print('API error: $e');
     }
   }
 
@@ -184,7 +184,6 @@ class _CommentSectionState extends State<CommentSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// Dropdown Activity
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -233,6 +232,14 @@ class _CommentSectionState extends State<CommentSection> {
                         ? aDate.compareTo(bDate)
                         : bDate.compareTo(aDate);
                   });
+
+                  activityLogs.sort((a, b) {
+                    final aDate = DateTime.parse(a.createdAt);
+                    final bDate = DateTime.parse(b.createdAt);
+                    return isOldestFirst
+                        ? aDate.compareTo(bDate)
+                        : bDate.compareTo(aDate);
+                  });
                 });
               },
               child: Text(isOldestFirst ? "Oldest first" : "Newest first"),
@@ -246,7 +253,7 @@ class _CommentSectionState extends State<CommentSection> {
             children:
                 comments.map((comment) {
                   final isEditing = editingCommentId == comment.id;
-                  // Hiển thị bình luận
+
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     shape: RoundedRectangleBorder(
@@ -289,9 +296,7 @@ class _CommentSectionState extends State<CommentSection> {
                                   fontSize: 12,
                                   color: Colors.grey,
                                 ),
-                                textAlign:
-                                    TextAlign
-                                        .right, // Căn phải nếu ở góc trên bên phải
+                                textAlign: TextAlign.right,
                               ),
                             ],
                           ),
@@ -318,6 +323,7 @@ class _CommentSectionState extends State<CommentSection> {
                                           editingCommentId = null;
                                         });
                                         await fetchComments();
+                                        await fetchActivityLogs();
                                       },
                                       child: const Text("Save"),
                                     ),
@@ -394,7 +400,9 @@ class _CommentSectionState extends State<CommentSection> {
                                                             ctx,
                                                             false,
                                                           ),
-                                                      child: const Text("Hủy"),
+                                                      child: const Text(
+                                                        "Cancel",
+                                                      ),
                                                     ),
                                                     TextButton(
                                                       onPressed:
@@ -402,7 +410,9 @@ class _CommentSectionState extends State<CommentSection> {
                                                             ctx,
                                                             true,
                                                           ),
-                                                      child: const Text("Xóa"),
+                                                      child: const Text(
+                                                        "Delete",
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -448,32 +458,39 @@ class _CommentSectionState extends State<CommentSection> {
           if (activityLogs.isNotEmpty) ...[
             Column(
               children: activityLogs.map((log) {
-                final activity = ActivityLog.fromJson(log); // Chuyển đổi log thành ActivityLog
                 return Card(
+                  color: Colors.white,
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   child: ListTile(
-                    title: Text(activity.message ?? ''),
-                    subtitle: Text('${activity.createdByName} - ${formatDateTime(activity.createdAt.toString())}'),
+                    title: Text(
+                      log.createdByName ?? 'None',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(log.message ?? ''),
+                        const SizedBox(height: 4),
+                        Text(
+                          formatDateTime(log.createdAt),
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
                   ),
                 );
-              }).toList(), // Đảm bảo đây là List<Widget>
+              }).toList(),
             ),
           ] else ...[
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                'Chưa có hoạt động nào',
-                style: TextStyle(color: Colors.grey[600], fontSize: 16),
-              ),
-            ),
+            const Center(child: Text('No activity logs found.')),
           ],
         ],
 
-        /// Input comment
         Row(
           children: [
             Expanded(
               child: TextField(
+                controller: _commentController,
                 onChanged: (value) => commentInput = value,
                 decoration: const InputDecoration(
                   hintText: "Comment...",
@@ -488,6 +505,7 @@ class _CommentSectionState extends State<CommentSection> {
                 await _createCommentTask(commentInput);
                 setState(() {
                   commentInput = '';
+                  _commentController.clear(); // <- xóa nội dung TextField
                 });
               },
             ),
@@ -498,8 +516,7 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   String formatDateTime(String createdAt) {
-    final dt =
-        DateTime.parse(createdAt).toLocal(); // Chuyển sang giờ local nếu cần
+    final dt = DateTime.parse(createdAt).toLocal();
     final date =
         "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
     final time =

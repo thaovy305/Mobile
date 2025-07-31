@@ -12,7 +12,7 @@ class ActivityLog {
   final String? message;
   final int? createdBy;
   final String? createdByName;
-  final DateTime? createdAt;
+  final String createdAt;
 
   ActivityLog({
     this.id,
@@ -28,7 +28,7 @@ class ActivityLog {
     this.message,
     this.createdBy,
     this.createdByName,
-    this.createdAt,
+    required this.createdAt,
   });
 
   factory ActivityLog.fromJson(Map<String, dynamic> json) {
@@ -46,7 +46,7 @@ class ActivityLog {
       message: json['message'],
       createdBy: json['createdBy'],
       createdByName: json['createdByName'],
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      createdAt: json['createdAt'] ?? '',
     );
   }
 
@@ -65,7 +65,7 @@ class ActivityLog {
       'message': message,
       'createdBy': createdBy,
       'createdByName': createdByName,
-      'createdAt': createdAt?.toIso8601String(),
+      'createdAt': createdAt,
     };
   }
 }

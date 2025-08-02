@@ -12,7 +12,7 @@ class Task {
   final String? epicName;
   final int? sprintId;
   final String? sprintName;
-  final String type;
+  String type;
   final bool? manualInput;
   final bool? generationAiInput;
   final String title;

@@ -27,6 +27,7 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   TextEditingController editController = TextEditingController();
   bool isOldestFirst = true;
   List<ActivityLog> activityLogs = [];
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
@@ -494,6 +495,7 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
           children: [
             Expanded(
               child: TextField(
+                controller: _commentController,
                 onChanged: (value) => commentInput = value,
                 decoration: const InputDecoration(
                   hintText: "Comment...",
@@ -504,11 +506,11 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
             IconButton(
               icon: const Icon(Icons.send),
               onPressed: () async {
-                if (commentInput.trim().isEmpty) return;
-                await _createCommentSubtask(commentInput);
-                setState(() {
-                  commentInput = '';
-                });
+                final text = _commentController.text.trim();
+                if (text.isEmpty) return;
+                await _createCommentSubtask(text);
+                _commentController.clear();
+                setState(() {});
               },
             ),
           ],

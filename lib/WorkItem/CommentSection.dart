@@ -457,29 +457,30 @@ class _CommentSectionState extends State<CommentSection> {
         ] else if (selectedActivity == 'History') ...[
           if (activityLogs.isNotEmpty) ...[
             Column(
-              children: activityLogs.map((log) {
-                return Card(
-                  color: Colors.white,
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    title: Text(
-                      log.createdByName ?? 'None',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(log.message ?? ''),
-                        const SizedBox(height: 4),
-                        Text(
-                          formatDateTime(log.createdAt),
-                          style: const TextStyle(color: Colors.grey),
+              children:
+                  activityLogs.map((log) {
+                    return Card(
+                      color: Colors.white,
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: ListTile(
+                        title: Text(
+                          log.createdByName ?? 'None',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(log.message ?? ''),
+                            const SizedBox(height: 4),
+                            Text(
+                              formatDateTime(log.createdAt),
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
             ),
           ] else ...[
             const Center(child: Text('No activity logs found.')),
@@ -501,12 +502,11 @@ class _CommentSectionState extends State<CommentSection> {
             IconButton(
               icon: const Icon(Icons.send),
               onPressed: () async {
-                if (commentInput.trim().isEmpty) return;
-                await _createCommentTask(commentInput);
-                setState(() {
-                  commentInput = '';
-                  _commentController.clear(); // <- xóa nội dung TextField
-                });
+                final text = _commentController.text.trim();
+                if (text.isEmpty) return;
+                await _createCommentTask(text);
+                _commentController.clear();
+                setState(() {});
               },
             ),
           ],

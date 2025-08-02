@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Helper/UriHelper.dart';
 import '../Models/ActivityLog.dart';
+import '../Models/Epic.dart';
 import '../Models/EpicComment.dart';
 
 class EpicCommentSection extends StatefulWidget {
@@ -27,6 +28,9 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
   TextEditingController editController = TextEditingController();
   bool isOldestFirst = true;
   List<ActivityLog> activityLogs = [];
+  final TextEditingController _commentController = TextEditingController();
+  Epic? epicData;
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -34,6 +38,7 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
     fetchComments();
     fetchCurrentUserId();
     fetchActivityLogs();
+    fetchEpicDetail();
   }
 
   Future<void> fetchComments() async {
@@ -55,11 +60,11 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
         });
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to fetch comment: ${response.statusCode}'),
-        ),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Failed to fetch comment: ${response.statusCode}'),
+      //   ),
+      // );
     }
   }
 
@@ -92,11 +97,11 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
       await fetchComments();
       await fetchActivityLogs();
     } else {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('Comment failed: ${response.statusCode}'),
-      //   ),
-      // );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Comment failed: ${response.statusCode}'),
+        ),
+      );
     }
   }
 
@@ -156,8 +161,51 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
     }
   }
 
+  Future<void> fetchEpicDetail() async {
+    try {
+      final uri = UriHelper.build('/epic/${widget.epicId}');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+
+        if (jsonBody['isSuccess'] == true) {
+          setState(() {
+            epicData = Epic.fromJson(jsonBody['data']);
+          });
+
+          await fetchActivityLogs();
+
+          setState(() {
+            isLoading = false;
+          });
+        } else {
+          showError(jsonBody['message'] ?? 'Epic not found');
+        }
+      } else {
+        showError('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      showError('Network error: $e');
+    }
+  }
+
+  void showError(String message) {
+    setState(() {
+      isLoading = false;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> fetchActivityLogs() async {
-    final uri = UriHelper.build('/activitylog/project/${widget.epicId}');
+    if (epicData?.projectId == null) {
+      print("projectId is null, cannot fetch logs.");
+      return;
+    }
+
+    final uri = UriHelper.build('/activitylog/project/${epicData!.projectId}');
     try {
       final response = await http.get(uri);
       if (response.statusCode == 200) {
@@ -489,6 +537,7 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
           children: [
             Expanded(
               child: TextField(
+                controller: _commentController,
                 onChanged: (value) => commentInput = value,
                 decoration: const InputDecoration(
                   hintText: "Comment...",
@@ -499,11 +548,11 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
             IconButton(
               icon: const Icon(Icons.send),
               onPressed: () async {
-                if (commentInput.trim().isEmpty) return;
-                await _createCommentEpic(commentInput);
-                setState(() {
-                  commentInput = '';
-                });
+                final text = _commentController.text.trim();
+                if (text.isEmpty) return;
+                await _createCommentEpic(text);
+                _commentController.clear();
+                setState(() {});
               },
             ),
           ],

@@ -87,4 +87,48 @@ class Subtask {
       'createdBy': createdBy,
     };
   }
+
+  Subtask copyWith({
+    String? id,
+    String? taskId,
+    int? assignedBy,
+    String? assignedByName,
+    String? assignedByPicture,
+    String? title,
+    String? description,
+    int? reporterId,
+    String? reporterName,
+    String? reporterPicture,
+    String? status,
+    String? priority,
+    bool? manualInput,
+    bool? generationAiInput,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? createdBy,
+  }) {
+    return Subtask(
+      id: id ?? this.id,
+      taskId: taskId ?? this.taskId,
+      assignedBy: assignedBy ?? this.assignedBy,
+      assignedByName: assignedByName ?? this.assignedByName,
+      assignedByPicture: assignedByPicture ?? this.assignedByPicture,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      reporterId: reporterId ?? this.reporterId,
+      reporterName: reporterName ?? this.reporterName,
+      reporterPicture: reporterPicture ?? this.reporterPicture,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      manualInput: manualInput ?? this.manualInput,
+      generationAiInput: generationAiInput ?? this.generationAiInput,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      createdBy: createdBy ?? this.createdBy,
+    );
+  }
 }

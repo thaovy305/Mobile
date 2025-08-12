@@ -1,15 +1,15 @@
-class TaskComment {
+class EpicComment {
   final int id;
-  final String taskId;
+  final String epicId;
   final int accountId;
   final String accountName;
   final String accountPicture;
   final String content;
   final String createdAt;
 
-  TaskComment({
+  EpicComment({
     required this.id,
-    required this.taskId,
+    required this.epicId,
     required this.accountId,
     required this.accountName,
     required this.accountPicture,
@@ -17,10 +17,10 @@ class TaskComment {
     required this.createdAt,
   });
 
-  factory TaskComment.fromJson(Map<String, dynamic> json) {
-    return TaskComment(
+  factory EpicComment.fromJson(Map<String, dynamic> json) {
+    return EpicComment(
       id: json['id'] ?? 0,
-      taskId: json['taskId'] ?? '',
+      epicId: json['epicId'] ?? '',
       accountId: json['accountId'] ?? 0,
       accountName: json['accountName'] ?? 'Unknown',
       accountPicture: json['accountPicture'] ?? 'None',
@@ -32,7 +32,7 @@ class TaskComment {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'taskId': taskId,
+      'epicId': epicId,
       'accountId': accountId,
       'accountName': accountName,
       'accountPicture': accountPicture,

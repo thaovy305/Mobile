@@ -17,13 +17,14 @@ class ProjectOverviewPage extends StatelessWidget {
   final List<String> tabs = [
     "Backlog",
     "Board",
+    "Dashboard",
+    "Risk",
     "Summary",
     "Calendar",
     "Forms",
     "Timeline",
     "Reports",
-    "Dashboard",
-    "Risk",
+
   ];
 
   @override

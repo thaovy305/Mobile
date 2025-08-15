@@ -83,13 +83,25 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   }
 
   Future<void> updateEpicStatus(String newStatus) async {
+    final prefs = await SharedPreferences.getInstance();
+    final createdBy = prefs.getInt('accountId');
+
+    if (createdBy == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
+      return;
+    }
+
     final uri = UriHelper.build('/epic/${widget.epicId}/status');
+
+    final payload = {"status": newStatus, "createdBy": createdBy};
 
     try {
       final response = await http.patch(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(newStatus),
+        body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200) {
@@ -529,7 +541,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                   _isAttachmentsExpanded = !_isAttachmentsExpanded;
                 });
                 if (_isAttachmentsExpanded && _epicFiles.isEmpty) {
-                  await _fetchEpicFiles(); // Gọi API khi mở ra
+                  await _fetchEpicFiles();
                 }
               },
               child:

@@ -6,6 +6,7 @@ class UriHelper {
   static const String _baseUrl =
       'https://intellipm-fpt-g6drgmbga8fcbubw.southeastasia-01.azurewebsites.net/api';
 
+
   static Uri build(String endpoint) {
     return Uri.parse('$_baseUrl$endpoint');
   }

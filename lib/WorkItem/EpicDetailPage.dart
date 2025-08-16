@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import '../Helper/UriHelper.dart';
 import '../Models/EpicFile.dart';
 import '../Models/Task.dart';
 import '../models/epic.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:image_picker/image_picker.dart';
 import 'EpicCommentSection.dart';
 import 'TaskDetailPage.dart';
 
@@ -209,6 +210,178 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
       }
     } catch (e) {
       print("Failed to load attachments: $e");
+    } finally {
+      setState(() {
+        _isLoadingAttachments = false;
+      });
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    // Show dialog to choose between camera and file picker
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Take a Photo'),
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Choose from Gallery'),
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.attach_file),
+            title: const Text('Choose a File'),
+            onTap: () => Navigator.pop(context, null), // Use file picker
+          ),
+        ],
+      ),
+    );
+
+    try {
+      PlatformFile? file;
+      String? fileName;
+
+      if (source != null) {
+        // Use image_picker for camera or gallery
+        final ImagePicker _picker = ImagePicker();
+        final XFile? photo = await _picker.pickImage(source: source);
+        if (photo == null) {
+          print('No photo selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No photo selected')),
+          );
+          return;
+        }
+        file = PlatformFile(
+          name: photo.name,
+          path: photo.path,
+          size: await photo.length(),
+        );
+        fileName = photo.name;
+      } else {
+        // Use file_picker for other files
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) {
+          print('No file selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+          return;
+        }
+        file = result.files.first;
+        fileName = file.name;
+      }
+
+      if (file.path == null && file.bytes == null) {
+        print('Error: Both file.path and file.bytes are null');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Selected file has no valid path or data')),
+        );
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final accountId = prefs.getInt('accountId');
+      print('Account ID: $accountId');
+
+      if (accountId == null) {
+        print('Error: accountId not found in SharedPreferences');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/epicfile/upload');
+      print('API URL: $uri');
+      var request = http.MultipartRequest('POST', uri);
+
+      request.headers['accept'] = '*/*';
+      request.headers['Content-Type'] = 'multipart/form-data';
+
+      final token = prefs.getString('accessToken');
+      if (token != null) {
+        print('Adding Bearer token to headers');
+        request.headers['Authorization'] = 'Bearer $token';
+      } else {
+        print('Warning: No access token found in SharedPreferences');
+      }
+
+      // Add form fields
+      request.fields['epicId'] = widget.epicId;
+      request.fields['title'] = fileName;
+      request.fields['createdBy'] = accountId.toString();
+      print('Form fields: ${request.fields}');
+
+      // Add the file
+      if (file.path != null) {
+        print('Using file.path to upload');
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'urlFile',
+            file.path!,
+            filename: fileName,
+          ),
+        );
+      } else if (file.bytes != null) {
+        print('Using file.bytes to upload');
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'urlFile',
+            file.bytes!,
+            filename: fileName,
+          ),
+        );
+      }
+
+      // Send the request
+      setState(() {
+        _isLoadingAttachments = true;
+      });
+      print('Sending multipart request...');
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+      print('Response status: ${response.statusCode}');
+      print('Response body: $responseBody');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonResponse = jsonDecode(responseBody);
+        print('Parsed JSON response: $jsonResponse');
+
+        if (jsonResponse['isSuccess'] == true ||
+            (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File uploaded successfully')),
+          );
+          await _fetchEpicFiles();
+        } else {
+          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
+        );
+      }
+    } catch (e) {
+      print('Error uploading file: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading file: $e')),
+      );
     } finally {
       setState(() {
         _isLoadingAttachments = false;
@@ -599,9 +772,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                               ),
                               const SizedBox(height: 8),
                               OutlinedButton.icon(
-                                onPressed: () {
-                                  // Thêm chức năng upload
-                                },
+                                onPressed: _uploadFile,
                                 icon: const Icon(Icons.add),
                                 label: const Text("Add attachment"),
                               ),

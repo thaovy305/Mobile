@@ -3,6 +3,8 @@ import 'Backlog/BacklogMainPage.dart';
 import 'Dashboard/Dashboard.dart';
 import 'KanbanBoard/KanbanBoardMain.dart';
 import 'Risk/RiskPage.dart';
+import 'Document/DocumentPage.dart';
+
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
@@ -59,7 +61,8 @@ class ProjectOverviewPage extends StatelessWidget {
           ),
         ),
         body: TabBarView(
-          children: tabs.map((tab) {
+          children: tabs.map<Widget>((tab) {
+
             if (tab == "Backlog") {
               return BacklogMainPage(projectKey: projectKey);
             } 
@@ -71,6 +74,10 @@ class ProjectOverviewPage extends StatelessWidget {
             }
             if (tab == "Risk") {
               return RiskPage(projectKey: projectKey);
+            }
+            if (tab == "Forms") {
+              return DocumentPage(projectKey: projectKey);
+
             }
 
             return Center(

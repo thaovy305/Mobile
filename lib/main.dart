@@ -7,6 +7,7 @@ import 'HomePage.dart';
 import 'Login/LoginPage.dart';
 import 'MainScreen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 
 
 void main() async {
@@ -44,6 +45,8 @@ class MyApp extends StatelessWidget {
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+
       ],
       supportedLocales: const [
         Locale('vi', 'VN'),

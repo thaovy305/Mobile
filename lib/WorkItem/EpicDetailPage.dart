@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import '../Helper/UriHelper.dart';
 import '../Models/EpicFile.dart';
 import '../Models/Task.dart';
 import '../models/epic.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import 'CommentSection.dart';
+import 'package:image_picker/image_picker.dart';
+import 'EpicCommentSection.dart';
+import 'TaskDetailPage.dart';
 
 class EpicDetailPage extends StatefulWidget {
   final String epicId;
@@ -81,13 +84,25 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   }
 
   Future<void> updateEpicStatus(String newStatus) async {
+    final prefs = await SharedPreferences.getInstance();
+    final createdBy = prefs.getInt('accountId');
+
+    if (createdBy == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
+      return;
+    }
+
     final uri = UriHelper.build('/epic/${widget.epicId}/status');
+
+    final payload = {"status": newStatus, "createdBy": createdBy};
 
     try {
       final response = await http.patch(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(newStatus),
+        body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200) {
@@ -120,7 +135,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildStatusOption("TO_DO", Colors.grey,  context),
+          _buildStatusOption("TO_DO", Colors.grey, context),
           const Divider(),
           _buildStatusOption("IN_PROGRESS", Color(0xFF5BA6E3), context),
           const Divider(),
@@ -133,8 +148,8 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   Widget _buildStatusOption(String status, Color color, BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).pop(); // Đóng bottom sheet
-        updateEpicStatus(status); // Gọi hàm update API
+        Navigator.of(context).pop();
+        updateEpicStatus(status);
       },
       child: Container(
         width: double.infinity,
@@ -150,7 +165,10 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               ),
               child: Text(
                 status.replaceAll('_', ' '),
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -199,6 +217,178 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
     }
   }
 
+  Future<void> _uploadFile() async {
+    // Show dialog to choose between camera and file picker
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Take a Photo'),
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Choose from Gallery'),
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.attach_file),
+            title: const Text('Choose a File'),
+            onTap: () => Navigator.pop(context, null), // Use file picker
+          ),
+        ],
+      ),
+    );
+
+    try {
+      PlatformFile? file;
+      String? fileName;
+
+      if (source != null) {
+        // Use image_picker for camera or gallery
+        final ImagePicker _picker = ImagePicker();
+        final XFile? photo = await _picker.pickImage(source: source);
+        if (photo == null) {
+          print('No photo selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No photo selected')),
+          );
+          return;
+        }
+        file = PlatformFile(
+          name: photo.name,
+          path: photo.path,
+          size: await photo.length(),
+        );
+        fileName = photo.name;
+      } else {
+        // Use file_picker for other files
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) {
+          print('No file selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+          return;
+        }
+        file = result.files.first;
+        fileName = file.name;
+      }
+
+      if (file.path == null && file.bytes == null) {
+        print('Error: Both file.path and file.bytes are null');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Selected file has no valid path or data')),
+        );
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final accountId = prefs.getInt('accountId');
+      print('Account ID: $accountId');
+
+      if (accountId == null) {
+        print('Error: accountId not found in SharedPreferences');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/epicfile/upload');
+      print('API URL: $uri');
+      var request = http.MultipartRequest('POST', uri);
+
+      request.headers['accept'] = '*/*';
+      request.headers['Content-Type'] = 'multipart/form-data';
+
+      final token = prefs.getString('accessToken');
+      if (token != null) {
+        print('Adding Bearer token to headers');
+        request.headers['Authorization'] = 'Bearer $token';
+      } else {
+        print('Warning: No access token found in SharedPreferences');
+      }
+
+      // Add form fields
+      request.fields['epicId'] = widget.epicId;
+      request.fields['title'] = fileName;
+      request.fields['createdBy'] = accountId.toString();
+      print('Form fields: ${request.fields}');
+
+      // Add the file
+      if (file.path != null) {
+        print('Using file.path to upload');
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'urlFile',
+            file.path!,
+            filename: fileName,
+          ),
+        );
+      } else if (file.bytes != null) {
+        print('Using file.bytes to upload');
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'urlFile',
+            file.bytes!,
+            filename: fileName,
+          ),
+        );
+      }
+
+      // Send the request
+      setState(() {
+        _isLoadingAttachments = true;
+      });
+      print('Sending multipart request...');
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+      print('Response status: ${response.statusCode}');
+      print('Response body: $responseBody');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonResponse = jsonDecode(responseBody);
+        print('Parsed JSON response: $jsonResponse');
+
+        if (jsonResponse['isSuccess'] == true ||
+            (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File uploaded successfully')),
+          );
+          await _fetchEpicFiles();
+        } else {
+          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
+        );
+      }
+    } catch (e) {
+      print('Error uploading file: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading file: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoadingAttachments = false;
+      });
+    }
+  }
+
   Future<List<Task>> fetchTasksByEpicId(String epicId) async {
     final response = await http.get(
       UriHelper.build('/task/by-epic-id?epicId=${widget.epicId}'),
@@ -225,7 +415,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
       elevation: 0,
       child: InkWell(
         // 👈 Bắt sự kiện nhấn
-        onTap: onTap, // 👈 Thêm xử lý onTap tại đây
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -272,6 +462,160 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
         return 'assets/type_story.svg';
       default:
         return 'assets/type_task.svg'; // fallback
+    }
+  }
+
+  void _showCreateTaskSheet(BuildContext context) {
+    String title = '';
+    String selectedType = 'Task';
+
+    final types = ['Task', 'Bug', 'Story'];
+    final icons = [
+      'assets/type_task.svg',
+      'assets/type_bug.svg',
+      'assets/type_story.svg',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 20,
+          left: 16,
+          right: 16,
+        ),
+        child: StatefulBuilder(
+          builder: (context, setModalState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Create Task', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+
+              TextField(
+                decoration: const InputDecoration(labelText: 'Title'),
+                onChanged: (val) => title = val,
+              ),
+              const SizedBox(height: 16),
+
+              const Text('Issue Type', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+
+              ...List.generate(types.length, (index) {
+                final type = types[index];
+                final selected = selectedType == type;
+                return InkWell(
+                  onTap: () {
+                    setModalState(() {
+                      selectedType = type;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: selected ? Colors.blue : Colors.grey.shade300),
+                    ),
+                    child: ListTile(
+                      leading: SvgPicture.asset(icons[index], width: 24, height: 24),
+                      title: Text(type),
+                      trailing: selected ? const Icon(Icons.check, color: Colors.blue) : null,
+                    ),
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _createTask(title, selectedType, context),
+                  child: const Text('Create Task'),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createTask(
+    String title,
+    String type,
+    BuildContext context,
+  ) async {
+    if (title.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Title cannot be empty")));
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final accountId = prefs.getInt('accountId');
+    final projectId = epicData?.projectId;
+    final epicId = epicData?.id;
+    final sprintId = epicData?.sprintId;
+    final now = DateTime.now().toIso8601String();
+    print('accountId: $accountId, projectId: $projectId, epicId: $epicId, sprintId: $sprintId');
+
+    final payload = {
+      "reporterId": accountId,
+      "projectId": projectId,
+      "epicId": epicId,
+      "sprintId": sprintId,
+      "type": type.toUpperCase(),
+      "title": title,
+      "createdBy": accountId,
+      "dependencies": [],
+    };
+
+    try {
+      final response = await http.post(
+        UriHelper.build('/task'),
+        headers: {'Content-Type': 'application/json', 'Accept': '*/*'},
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 201) {
+        final json = jsonDecode(response.body);
+        if (json['isSuccess']) {
+          final newTask = Task.fromJson(json['data']);
+          setState(() {
+            _tasks.insert(0, newTask);
+          });
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Task created successfully")),
+          );
+        } else {
+          throw Exception(json['message']);
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to create task: $e")));
     }
   }
 
@@ -341,8 +685,13 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _statusColor(epicData!.status),
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -365,7 +714,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                   _isAttachmentsExpanded = !_isAttachmentsExpanded;
                 });
                 if (_isAttachmentsExpanded && _epicFiles.isEmpty) {
-                  await _fetchEpicFiles(); // Gọi API khi mở ra
+                  await _fetchEpicFiles();
                 }
               },
               child:
@@ -423,9 +772,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                               ),
                               const SizedBox(height: 8),
                               OutlinedButton.icon(
-                                onPressed: () {
-                                  // Thêm chức năng upload
-                                },
+                                onPressed: _uploadFile,
                                 icon: const Icon(Icons.add),
                                 label: const Text("Add attachment"),
                               ),
@@ -454,8 +801,10 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                       final total = _tasks.length;
                       if (total == 0) return const SizedBox();
 
-                      final done = _tasks.where((s) => s.status == 'DONE').length;
-                      final inProgress = _tasks.where((s) => s.status == 'IN_PROGRESS').length;
+                      final done =
+                          _tasks.where((s) => s.status == 'DONE').length;
+                      final inProgress =
+                          _tasks.where((s) => s.status == 'IN_PROGRESS').length;
                       final toDo = total - done - inProgress;
 
                       return Column(
@@ -506,7 +855,10 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                           const SizedBox(height: 4),
                           Text(
                             "Progress: $done/$total done",
-                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
                           ),
                           const SizedBox(height: 8),
                         ],
@@ -514,39 +866,68 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                     },
                   ),
 
-                  // Expand/collapse task list
                   _isTaskExpanded
                       ? Column(
-                    children: [
-                      ..._tasks.map(
+                        children: [
+                          ..._tasks.map(
                             (task) => ListTile(
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                          contentPadding: EdgeInsets.symmetric(vertical: 4),
-                          leading: SvgPicture.asset(getTypeIcon(task.type), width: 18, height: 18),
-                          title: Text(task.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          subtitle: Text(task.id, style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _statusColor(task.status ?? ''),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              task.status ?? "UNKNOWN",
-                              style: const TextStyle(fontSize: 11),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) =>
+                                            TaskDetailPage(taskId: task.id),
+                                  ),
+                                );
+                              },
+                              dense: true,
+                              visualDensity: VisualDensity.compact,
+                              contentPadding: EdgeInsets.symmetric(vertical: 4),
+                              leading: SvgPicture.asset(
+                                getTypeIcon(task.type),
+                                width: 18,
+                                height: 18,
+                              ),
+                              title: Text(
+                                task.title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                task.id,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _statusColor(task.status ?? ''),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  task.status ?? "UNKNOWN",
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.add),
-                        label: const Text("Create child work item"),
-                      ),
-                    ],
-                  )
+
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () => _showCreateTaskSheet(context),
+                            icon: const Icon(Icons.add),
+                            label: const Text("Create task"),
+                          ),
+                        ],
+                      )
                       : const SizedBox.shrink(),
                 ],
               ),
@@ -556,20 +937,35 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               title: "Assignee",
               child: ListTile(
                 dense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 2,
+                  horizontal: 0,
+                ),
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage: (epicData!.assignedByPicture != null && epicData!.assignedByPicture!.isNotEmpty)
-                      ? NetworkImage(epicData!.assignedByPicture!)
-                      : null,
+                  backgroundImage:
+                      (epicData!.assignedByPicture != null &&
+                              epicData!.assignedByPicture!.isNotEmpty)
+                          ? NetworkImage(epicData!.assignedByPicture!)
+                          : null,
                   backgroundColor: Colors.blue[100],
-                  child: (epicData!.assignedByPicture == null || epicData!.assignedByPicture!.isEmpty)
-                      ? Text(
-                    (epicData!.assignedByFullname?.split(' ').last.characters.first ?? 'U'),
-                    style: const TextStyle(fontSize: 12, color: Colors.black),
-                  )
-                      : null,
+                  child:
+                      (epicData!.assignedByPicture == null ||
+                              epicData!.assignedByPicture!.isEmpty)
+                          ? Text(
+                            (epicData!.assignedByFullname
+                                    ?.split(' ')
+                                    .last
+                                    .characters
+                                    .first ??
+                                'U'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black,
+                            ),
+                          )
+                          : null,
                 ),
                 title: Text(
                   epicData!.assignedByFullname ?? 'Unassigned',
@@ -584,19 +980,17 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  buildDetailRow("Issue Type", "Epic 🟣"),
                   buildDetailRow(
                     "Start Date",
-                    epicData!.startDate.toIso8601String().split("T").first ?? 'None',
+                    epicData!.startDate.toIso8601String().split("T").first ??
+                        'None',
                   ),
                   buildDetailRow(
                     "End Date",
-                    epicData!.endDate.toIso8601String().split("T").first ?? 'None',
+                    epicData!.endDate.toIso8601String().split("T").first ??
+                        'None',
                   ),
-                  buildDetailRow(
-                    "Sprint",
-                    epicData!.sprintName ?? 'None',
-                  ),
+                  buildDetailRow("Sprint", epicData!.sprintName ?? 'None'),
                 ],
               ),
             ),
@@ -606,20 +1000,35 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               title: "Reporter",
               child: ListTile(
                 dense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 2,
+                  horizontal: 0,
+                ),
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage: (epicData!.reporterPicture != null && epicData!.reporterPicture!.isNotEmpty)
-                      ? NetworkImage(epicData!.reporterPicture!)
-                      : null,
+                  backgroundImage:
+                      (epicData!.reporterPicture != null &&
+                              epicData!.reporterPicture!.isNotEmpty)
+                          ? NetworkImage(epicData!.reporterPicture!)
+                          : null,
                   backgroundColor: Colors.grey[300],
-                  child: (epicData!.reporterPicture == null || epicData!.reporterPicture!.isEmpty)
-                      ? Text(
-                    (epicData!.reporterFullname?.split(' ').last.characters.first ?? 'U'),
-                    style: const TextStyle(fontSize: 12, color: Colors.black),
-                  )
-                      : null,
+                  child:
+                      (epicData!.reporterPicture == null ||
+                              epicData!.reporterPicture!.isEmpty)
+                          ? Text(
+                            (epicData!.reporterFullname
+                                    ?.split(' ')
+                                    .last
+                                    .characters
+                                    .first ??
+                                'U'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black,
+                            ),
+                          )
+                          : null,
                 ),
                 title: Text(
                   epicData!.reporterFullname ?? 'Unassigned',
@@ -627,7 +1036,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 ),
               ),
             ),
-            CommentSection()
+            EpicCommentSection(epicId: epicData?.id ?? ''),
           ],
         ),
       ),

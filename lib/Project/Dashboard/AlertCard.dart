@@ -92,6 +92,9 @@ import 'Dashboard.dart';
 //   }
 // }
 
+import 'package:flutter/material.dart';
+import 'Dashboard.dart';
+
 class AlertCard extends StatelessWidget {
   final double spi;
   final double cpi;
@@ -133,7 +136,7 @@ class AlertCard extends StatelessWidget {
             const Text('• Please review suggested actions from AI below.'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: onShowAIRecommendations,
+              onPressed: isRecLoading ? null : onShowAIRecommendations,
               child: const Text('Show AI Recommendations'),
             ),
             if (isRecLoading)
@@ -141,22 +144,10 @@ class AlertCard extends StatelessWidget {
                 padding: EdgeInsets.only(top: 8.0),
                 child: CircularProgressIndicator(),
               ),
-            if (showRecommendations && aiRecommendations.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'AI Recommendations:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              ...aiRecommendations.map(
-                (rec) => ListTile(
-                  title: Text(rec.recommendation),
-                  subtitle: Text(rec.details),
-                ),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 }
+

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'Backlog/BacklogMainPage.dart';
 import 'Dashboard/Dashboard.dart';
 import 'KanbanBoard/KanbanBoardMain.dart';
+import 'Risk/RiskPage.dart';
+import 'Document/DocumentPage.dart';
+
 
 class ProjectOverviewPage extends StatelessWidget {
   final String projectName;
@@ -16,12 +19,14 @@ class ProjectOverviewPage extends StatelessWidget {
   final List<String> tabs = [
     "Backlog",
     "Board",
+    "Dashboard",
+    "Risk",
     "Summary",
     "Calendar",
     "Forms",
     "Timeline",
     "Reports",
-    "Dashboard",
+
   ];
 
   @override
@@ -57,15 +62,23 @@ class ProjectOverviewPage extends StatelessWidget {
           ),
         ),
         body: TabBarView(
-          children: tabs.map((tab) {
+          children: tabs.map<Widget>((tab) {
+
             if (tab == "Backlog") {
-              return BacklogMainPage(projectKey: projectKey); // Truyền projectKey
+              return BacklogMainPage(projectKey: projectKey);
             } 
             if (tab == "Dashboard") {
               return DashboardPage(projectKey: projectKey);
             }
             if (tab == "Board") {
               return KanbanBoardMain(projectKey: projectKey);
+            }
+            if (tab == "Risk") {
+              return RiskPage(projectKey: projectKey);
+            }
+            if (tab == "Forms") {
+              return DocumentPage(projectKey: projectKey);
+
             }
 
             return Center(

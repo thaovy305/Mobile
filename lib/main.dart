@@ -6,6 +6,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'HomePage.dart';
 import 'Login/LoginPage.dart';
 import 'MainScreen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,10 +41,21 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1c73fd)),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+
+      ],
+      supportedLocales: const [
+        Locale('vi', 'VN'),
+        Locale('en', 'US'),
+      ],
       initialRoute: initialRoute,
       routes: {
         '/login': (context) => LoginPage(),
-        '/main': (context) =>  MainScreen(),
+        '/main': (context) => MainScreen(),
       },
     );
   }

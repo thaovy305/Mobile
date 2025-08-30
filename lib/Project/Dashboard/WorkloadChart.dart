@@ -668,7 +668,7 @@ class WorkloadChart extends StatelessWidget {
       };
     }).toList();
 
-    // Calculate maxX (total tasks) for the horizontal axis
+    // Calculate maxTasks for the X-axis (dynamic scaling)
     final maxTasks = chartData
         .map((member) =>
     (member['Completed'] as double) +
@@ -677,19 +677,18 @@ class WorkloadChart extends StatelessWidget {
         .reduce((a, b) => a > b ? a : b)
         .ceil()
         .toDouble();
-    final maxX = maxTasks > 0 ? maxTasks * 1.2 : 10.0;
 
     return Padding(
       padding: const EdgeInsets.only(
-        top: 20.0, // Matches web margin top: 20px
-        right: 30.0, // Matches web margin right: 30px
-        left: 10.0, // Matches web margin left: 10px
-        bottom: 5.0, // Matches web margin bottom: 5px
+        top: 20.0,
+        right: 30.0,
+        left: 10.0,
+        bottom: 5.0,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Legends (always visible, matching web Legend)
+          // Legends
           Wrap(
             spacing: 16,
             children: [
@@ -700,138 +699,101 @@ class WorkloadChart extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           SizedBox(
-            height: 300, // Matches web height: 300px
+            height: 300,
             child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: chartData.length - 0.5, // Prevent duplicate labels
-                minY: -0.5,
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: Colors.black.withOpacity(0.8),
-                    tooltipRoundedRadius: 8,
-                    tooltipPadding: const EdgeInsets.all(8),
-                    tooltipMargin: 8,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final keys = ['Completed', 'Remaining', 'Overdue'];
-                      final member = chartData[groupIndex];
-                      return BarTooltipItem(
-                        '${keys[rodIndex]}: ${(member[keys[rodIndex]] as double).toInt()}',
-                        const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      );
-                    },
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    // giữ nguyên phần tooltip
                   ),
-                  handleBuiltInTouches: true,
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        if (value % (maxX / 5).ceil() == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              value.toInt().toString(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 100,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < chartData.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Text(
+                                chartData[index]['name'] as String,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.right,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 100,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index >= 0 && index < chartData.length && value == index.toDouble()) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              chartData[index]['name'] as String,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                              textAlign: TextAlign.right,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  drawHorizontalLine: false,
-                  getDrawingVerticalLine: (value) => FlLine(
-                    color: Colors.grey.withOpacity(0.3),
-                    strokeWidth: 1,
-                    dashArray: [3, 3],
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: chartData.asMap().entries.map((entry) {
-                  final index = entry.value['index'] as int;
-                  final member = entry.value;
-                  return BarChartGroupData(
-                    x: index,
-                    barRods: [
-                      BarChartRodData(
-                        toY: index.toDouble(), // Position bar at index
-                        fromY: index.toDouble() - 0.4, // Fixed height for bar
-                        width: 25,
-                        color: Colors.transparent,
-                        rodStackItems: [
-                          BarChartRodStackItem(
-                            0,
-                            member['Completed'] as double,
-                            const Color(0xFF00C49F),
-                          ),
-                          BarChartRodStackItem(
-                            member['Completed'] as double,
-                            (member['Completed'] as double) + (member['Remaining'] as double),
-                            const Color(0xFF00E0FF),
-                          ),
-                          BarChartRodStackItem(
-                            (member['Completed'] as double) + (member['Remaining'] as double),
-                            (member['Completed'] as double) +
-                                (member['Remaining'] as double) +
-                                (member['Overdue'] as double),
-                            const Color(0xFFFF4D4F),
-                          ),
-                        ],
-                        borderRadius: BorderRadius.zero,
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                        interval: 1, // 👈 quan trọng: mỗi step = 1 thành viên
                       ),
-                    ],
-                    showingTooltipIndicators: [],
-                  );
-                }).toList(),
-              ),
-              swapAnimationDuration: const Duration(milliseconds: 300),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          // Bạn có thể vẽ số lượng task ở đây
+                          return Text(
+                            value.toInt().toString(),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          );
+                        },
+                        interval: (maxTasks / 5).ceilToDouble(), // 👈 step cho trục X
+                      ),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                  ),
+                  gridData: FlGridData(show: true),
+                  borderData: FlBorderData(show: false),
+                  barGroups: chartData.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final member = entry.value;
+                    return BarChartGroupData(
+                      x: index, // 👈 phải là int
+                      barRods: [
+                        BarChartRodData(
+                          toY: (member['Completed'] as double) +
+                              (member['Remaining'] as double) +
+                              (member['Overdue'] as double),
+                          fromY: 0,
+                          rodStackItems: [
+                            BarChartRodStackItem(
+                              0,
+                              member['Completed'] as double,
+                              const Color(0xFF00C49F),
+                            ),
+                            BarChartRodStackItem(
+                              member['Completed'] as double,
+                              (member['Completed'] as double) + (member['Remaining'] as double),
+                              const Color(0xFF00E0FF),
+                            ),
+                            BarChartRodStackItem(
+                              (member['Completed'] as double) + (member['Remaining'] as double),
+                              (member['Completed'] as double) +
+                                  (member['Remaining'] as double) +
+                                  (member['Overdue'] as double),
+                              const Color(0xFFFF4D4F),
+                            ),
+                          ],
+                          borderRadius: BorderRadius.zero,
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+                swapAnimationDuration: const Duration(milliseconds: 300),
               swapAnimationCurve: Curves.easeInOut,
             ),
           ),
@@ -876,4 +838,3 @@ class WorkloadChart extends StatelessWidget {
     return 0.0;
   }
 }
-

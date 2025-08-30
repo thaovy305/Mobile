@@ -53,7 +53,7 @@ class _DocumentFromHtmlPageState extends State<DocumentFromHtmlPage> {
           Expanded(
             child: QuillEditor.basic(
               controller: _controller,
-              readOnly: false,
+              //readOnly: false,
             ),
           ),
         ],

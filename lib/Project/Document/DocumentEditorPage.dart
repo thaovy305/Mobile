@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../Helper/UriHelper.dart';
 
 import 'package:file_picker/file_picker.dart';
 
@@ -31,7 +32,8 @@ class _DocumentEditorPageState extends State<DocumentEditorPage> {
     final token = prefs.getString('accessToken') ?? '';
     final htmlContent = await controller.getText();
 
-    final url = Uri.parse('https://10.0.2.2:7128/api/documents/${widget.documentId}');
+    // final url = Uri.parse('https://10.0.2.2:7128/api/documents/${widget.documentId}');
+    final url = UriHelper.build('/documents/${widget.documentId}');
     final body = jsonEncode({
       "title": widget.title,
       "content": htmlContent,
@@ -83,7 +85,7 @@ class _DocumentEditorPageState extends State<DocumentEditorPage> {
         controller: controller,
         htmlEditorOptions: HtmlEditorOptions(
           initialText: widget.content,
-          hint: 'Nhập nội dung HTML ở đây...',
+          hint: 'You can type content here ...',
         ),
         htmlToolbarOptions: HtmlToolbarOptions(
           toolbarPosition: ToolbarPosition.aboveEditor, //by default

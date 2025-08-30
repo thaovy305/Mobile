@@ -954,14 +954,14 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
           }
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Cập nhật $endpoint thành công')),
+          SnackBar(content: Text('Successfully updated $endpoint')),
         );
       } else {
         throw Exception('Failed to update $endpoint: ${response.statusCode}');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cập nhật $endpoint thất bại')),
+        SnackBar(content: Text('Failed to update $endpoint')),
       );
       print('Error updating $endpoint: $e');
     }
@@ -1064,7 +1064,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       print('Upload risk file response status: ${response.statusCode}');
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã tải lên file ${file.name}')),
+          SnackBar(content: Text('Successfully uploaded file ${file.name}')),
         );
         await fetchRiskFiles();
         await fetchActivityLogs();
@@ -1073,7 +1073,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tải file thất bại')),
+        const SnackBar(content: Text('Failed to upload file')),
       );
       print('Error uploading file: $e');
     }
@@ -1092,7 +1092,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       print('Delete risk file response status: ${response.statusCode}');
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa file')),
+          const SnackBar(content: Text('Successfully deleted file')),
         );
         await fetchRiskFiles();
         await fetchActivityLogs();
@@ -1101,7 +1101,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xóa file thất bại')),
+        const SnackBar(content: Text('Failed to delete file')),
       );
       print('Error deleting file: $e');
     }
@@ -1160,7 +1160,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       print('Update risk comment response body: ${response.body}');
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật bình luận')),
+          const SnackBar(content: Text('Successfully updated comment')),
         );
         await fetchRiskComments();
         await fetchActivityLogs();
@@ -1169,7 +1169,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cập nhật bình luận thất bại')),
+        const SnackBar(content: Text('Failed to update comment')),
       );
       print('Error updating comment: $e');
     }
@@ -1188,7 +1188,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       print('Delete risk comment response status: ${response.statusCode}');
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa bình luận')),
+          const SnackBar(content: Text('Successfully deleted comment')),
         );
         await fetchRiskComments();
         await fetchActivityLogs();
@@ -1197,19 +1197,19 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xóa bình luận thất bại')),
+        const SnackBar(content: Text('Failed to delete comment')),
       );
       print('Error deleting comment: $e');
     }
   }
 
   String formatDate(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return "Không rõ";
+    if (dateStr == null || dateStr.isEmpty) return "Unknown";
     try {
       final date = DateTime.parse(dateStr);
       return DateFormat('dd/MM/yyyy').format(date);
     } catch (_) {
-      return "Không hợp lệ";
+      return "Invalid";
     }
   }
 
@@ -1264,14 +1264,14 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
             child: pictureUrl == null || pictureUrl.isEmpty ? const Icon(Icons.person, size: 18) : null,
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(fullName ?? username ?? 'Không phân công')),
+          Expanded(child: Text(fullName ?? username ?? 'Not assigned')),
         ],
       ),
     );
   }
 
   Widget buildLevelLabel(String title, String value) {
-    final displayValue = value.isNotEmpty ? value : "Không rõ";
+    final displayValue = value.isNotEmpty ? value : "Unknown";
     final color = getLevelColor(displayValue);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1299,8 +1299,8 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final String createdBy = editableRisk.creatorFullName ?? editableRisk.creatorUserName ?? 'Không rõ';
-    final String responsible = editableRisk.responsibleFullName ?? editableRisk.responsibleUserName ?? 'Không phân công';
+    final String createdBy = editableRisk.creatorFullName ?? editableRisk.creatorUserName ?? 'Unknown';
+    final String responsible = editableRisk.responsibleFullName ?? editableRisk.responsibleUserName ?? 'Not assigned';
     final String dueDate = formatDate(editableRisk.dueDate);
     final String createdAt = formatDate(editableRisk.createdAt);
 
@@ -1331,7 +1331,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   TextField(
                     controller: TextEditingController(text: editableRisk.title),
                     decoration: const InputDecoration(
-                      labelText: 'Tiêu đề',
+                      labelText: 'Title',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (value) => setState(() => editableRisk.title = value),
@@ -1340,7 +1340,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Text("Trạng thái: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text("Status: ", style: TextStyle(fontWeight: FontWeight.bold)),
                       Expanded(
                         child: DropdownButton<String>(
                           isExpanded: true,
@@ -1368,12 +1368,12 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
                       } else if (snapshot.hasError) {
-                        return const Text("Không tải được loại rủi ro");
+                        return const Text("Failed to load risk types");
                       }
                       final types = snapshot.data!;
                       return Row(
                         children: [
-                          const Text("Loại: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text("Type: ", style: TextStyle(fontWeight: FontWeight.bold)),
                           Expanded(
                             child: DropdownButton<String>(
                               isExpanded: true,
@@ -1401,18 +1401,18 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
                       } else if (snapshot.hasError) {
-                        return const Text("Không tải được danh sách người phụ trách");
+                        return const Text("Failed to load assignees");
                       }
                       final assignees = snapshot.data!;
                       return Row(
                         children: [
-                          const Text("Người phụ trách: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text("Assignee: ", style: TextStyle(fontWeight: FontWeight.bold)),
                           Expanded(
                             child: DropdownButton<int>(
                               isExpanded: true,
                               value: editableRisk.responsibleId,
                               onChanged: (value) {
-                                final selected = assignees.firstWhere((a) => a.id == value, orElse: () => Assignee(id: 0, fullName: null, userName: 'Không phân công', picture: null));
+                                final selected = assignees.firstWhere((a) => a.id == value, orElse: () => Assignee(id: 0, fullName: null, userName: 'Not assigned', picture: null));
                                 setState(() {
                                   editableRisk.responsibleId = value ?? 0;
                                   editableRisk.responsibleFullName = selected.fullName;
@@ -1422,7 +1422,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                 updateRiskField('responsible', value);
                               },
                               items: [
-                                const DropdownMenuItem(value: 0, child: Text('Không phân công')),
+                                const DropdownMenuItem(value: 0, child: Text('Not assigned')),
                                 ...assignees.map((user) => DropdownMenuItem(
                                   value: user.id,
                                   child: Text(user.fullName ?? user.userName),
@@ -1437,13 +1437,13 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Text("Ngày đáo hạn: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text("Due Date: ", style: TextStyle(fontWeight: FontWeight.bold)),
                       Expanded(
                         child: TextFormField(
                           initialValue: editableRisk.dueDate?.split('T')[0] ?? '',
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
-                            hintText: 'Chọn ngày',
+                            hintText: 'Select date',
                           ),
                           onTap: () async {
                             final date = await showDatePicker(
@@ -1465,15 +1465,15 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   ),
                   const Divider(height: 32),
                   buildInfoRowWithAvatar(
-                    "Người tạo",
+                    "Created By",
                     editableRisk.creatorFullName,
                     editableRisk.creatorUserName,
                     editableRisk.creatorPicture,
                   ),
-                  buildInfoRow("Ngày tạo", createdAt),
+                  buildInfoRow("Created At", createdAt),
                   const SizedBox(height: 24),
                   const Text(
-                    "Mô tả",
+                    "Description",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
@@ -1481,7 +1481,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                     controller: TextEditingController(text: editableRisk.description),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: 'Nhập mô tả',
+                      hintText: 'Enter description',
                     ),
                     maxLines: 4,
                     onChanged: (value) => setState(() => editableRisk.description = value),
@@ -1489,11 +1489,11 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    "Phạm vi",
+                    "Scope",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
-                  Text(editableRisk.riskScope.isNotEmpty ? editableRisk.riskScope : "Không có thông tin"),
+                  Text(editableRisk.riskScope.isNotEmpty ? editableRisk.riskScope : "No information"),
                   const SizedBox(height: 24),
                   FutureBuilder<List<DynamicCategory>>(
                     future: impactCategoriesFuture,
@@ -1501,14 +1501,14 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
                       } else if (snapshot.hasError) {
-                        return const Text("Không tải được mức độ ảnh hưởng");
+                        return const Text("Failed to load impact levels");
                       }
                       final categories = snapshot.data!;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            "Mức độ ảnh hưởng",
+                            "Impact Level",
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           const SizedBox(height: 6),
@@ -1534,14 +1534,14 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const CircularProgressIndicator();
                       } else if (snapshot.hasError) {
-                        return const Text("Không tải được xác suất");
+                        return const Text("Failed to load probabilities");
                       }
                       final categories = snapshot.data!;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            "Xác suất",
+                            "Probability",
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           const SizedBox(height: 6),
@@ -1561,7 +1561,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  buildLevelLabel("Mức độ nghiêm trọng", editableRisk.severityLevel),
+                  buildLevelLabel("Severity Level", editableRisk.severityLevel),
                   const SizedBox(height: 24),
                   if (isRiskSolutionLoading)
                     const CircularProgressIndicator()
@@ -1570,7 +1570,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          "Kế hoạch giảm thiểu",
+                          "Mitigation Plan",
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 6),
@@ -1592,13 +1592,13 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                     },
                                     decoration: const InputDecoration(
                                       border: OutlineInputBorder(),
-                                      hintText: 'Nhập kế hoạch giảm thiểu',
+                                      hintText: 'Enter mitigation plan',
                                     ),
                                   )
                                       : Text(
                                     solution.mitigationPlan?.isNotEmpty == true
                                         ? solution.mitigationPlan!
-                                        : "Không có",
+                                        : "None",
                                     style: const TextStyle(color: Colors.grey),
                                   ),
                                 ),
@@ -1626,7 +1626,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                         }).toList(),
                         TextField(
                           decoration: const InputDecoration(
-                            hintText: 'Thêm kế hoạch giảm thiểu',
+                            hintText: 'Add mitigation plan',
                             border: OutlineInputBorder(),
                           ),
                           onChanged: (value) => newMitigation = value,
@@ -1639,7 +1639,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                         ),
                         const SizedBox(height: 24),
                         const Text(
-                          "Kế hoạch dự phòng",
+                          "Contingency Plan",
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 6),
@@ -1661,13 +1661,13 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                     },
                                     decoration: const InputDecoration(
                                       border: OutlineInputBorder(),
-                                      hintText: 'Nhập kế hoạch dự phòng',
+                                      hintText: 'Enter contingency plan',
                                     ),
                                   )
                                       : Text(
                                     solution.contingencyPlan?.isNotEmpty == true
                                         ? solution.contingencyPlan!
-                                        : "Không có",
+                                        : "None",
                                     style: const TextStyle(color: Colors.grey),
                                   ),
                                 ),
@@ -1695,7 +1695,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                         }).toList(),
                         TextField(
                           decoration: const InputDecoration(
-                            hintText: 'Thêm kế hoạch dự phòng',
+                            hintText: 'Add contingency plan',
                             border: OutlineInputBorder(),
                           ),
                           onChanged: (value) => newContingency = value,
@@ -1710,7 +1710,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                     ),
                   const SizedBox(height: 24),
                   const Text(
-                    "Tệp đính kèm",
+                    "Attachments",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
@@ -1727,7 +1727,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                             children: [
                               GestureDetector(
                                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Mở file không được hỗ trợ trong ứng dụng')),
+                                  const SnackBar(content: Text('Opening files is not supported in the app')),
                                 ),
                                 child: file.fileUrl.contains(RegExp(r'\.(jpg|jpeg|png|gif)$', caseSensitive: false))
                                     ? Image.network(file.fileUrl, height: 80, fit: BoxFit.cover)
@@ -1754,7 +1754,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       }).toList(),
                     )
                   else
-                    const Text("Không có tệp đính kèm"),
+                    const Text("No attachments"),
                   ElevatedButton(
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles();
@@ -1762,11 +1762,11 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                         await uploadRiskFile(result.files.first);
                       }
                     },
-                    child: const Text('Tải lên tệp'),
+                    child: const Text('Upload File'),
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    "Bình luận",
+                    "Comments",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
@@ -1816,7 +1816,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                           onChanged: (value) => editedCommentContent = value,
                                           decoration: const InputDecoration(
                                             border: OutlineInputBorder(),
-                                            hintText: 'Chỉnh sửa bình luận',
+                                            hintText: 'Edit comment',
                                           ),
                                         ),
                                         Row(
@@ -1826,11 +1826,11 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                                 updateRiskComment(comment.id, editedCommentContent);
                                                 setState(() => editingCommentId = null);
                                               },
-                                              child: const Text('Lưu', style: TextStyle(color: Colors.green)),
+                                              child: const Text('Save', style: TextStyle(color: Colors.green)),
                                             ),
                                             TextButton(
                                               onPressed: () => setState(() => editingCommentId = null),
-                                              child: const Text('Hủy', style: TextStyle(color: Colors.red)),
+                                              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
                                             ),
                                           ],
                                         ),
@@ -1847,11 +1847,11 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                                                 editedCommentContent = comment.comment;
                                               });
                                             },
-                                            child: const Text('Chỉnh sửa', style: TextStyle(color: Colors.blue)),
+                                            child: const Text('Edit', style: TextStyle(color: Colors.blue)),
                                           ),
                                           TextButton(
                                             onPressed: () => deleteRiskComment(comment.id),
-                                            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+                                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
                                           ),
                                         ],
                                       ),
@@ -1864,10 +1864,10 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       }).toList(),
                     )
                   else
-                    const Text("Không có bình luận"),
+                    const Text("No comments"),
                   TextField(
                     decoration: const InputDecoration(
-                      hintText: 'Thêm bình luận',
+                      hintText: 'Add comment',
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (value) => newComment = value,
@@ -1880,7 +1880,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    "Nhật ký hoạt động",
+                    "Activity Log",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
@@ -1915,7 +1915,7 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
                       }).toList(),
                     )
                   else
-                    const Text("Không có nhật ký hoạt động"),
+                    const Text("No activity logs"),
                 ],
               ),
             ),

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-
+import '../../Helper/UriHelper.dart';
 import 'Backlog/BacklogMainPage.dart';
 import 'Dashboard/Dashboard.dart';
 import 'KanbanBoard/KanbanBoardMain.dart';
@@ -48,7 +48,7 @@ class _ProjectOverviewPageState extends State<ProjectOverviewPage> {
   List<String> get _tabs {
     final tabs = List<String>.from(_baseTabs);
     final insertIndex = 6; // sau "Calendar"
-    tabs.insert(insertIndex, _isClient ? "Reports (Client)" : "Documents");
+    tabs.insert(insertIndex, _isClient ? "Document Report" : "Documents");
     return tabs;
   }
 
@@ -80,8 +80,7 @@ class _ProjectOverviewPageState extends State<ProjectOverviewPage> {
 
     // gọi API
     final token = prefs.getString('accessToken') ?? '';
-    final url = Uri.parse(
-        'https://10.0.2.2:7128/api/project/by-project-key?projectKey=${widget.projectKey}');
+    final url = UriHelper.build('/project/by-project-key?projectKey=${widget.projectKey}');
 
     final res = await http.get(url, headers: {
       'Authorization': 'Bearer $token',
@@ -144,7 +143,7 @@ class _ProjectOverviewPageState extends State<ProjectOverviewPage> {
               return DocumentPage(projectKey: widget.projectKey);
             }
 
-            if (tab == "Reports (Client)") {
+            if (tab == "Document Report") {
               // chờ resolve projectId rồi truyền vào DocumentReportPage
               return FutureBuilder<int>(
                 future: _resolvedProjectId,

@@ -13,11 +13,13 @@ class DocumentEditorPage extends StatefulWidget {
   final int documentId;
   final String title;
   final String content;
+  final String visibility;
   const DocumentEditorPage({
     super.key,
     required this.documentId,
     required this.title,
     required this.content,
+    required this.visibility,
   });
 
   @override
@@ -39,7 +41,7 @@ class _DocumentEditorPageState extends State<DocumentEditorPage> {
       "content": htmlContent,
       "template": "",
       "fileUrl": "",
-      "visibility": "MAIN",
+      "visibility": widget.visibility,
     });
 
     try {

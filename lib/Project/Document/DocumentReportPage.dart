@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../../Helper/UriHelper.dart';
 // Model không thay đổi
 class SharedDocument {
   final int id;
@@ -52,8 +52,7 @@ class _DocumentReportPageState extends State<DocumentReportPage> {
     final token = prefs.getString('accessToken') ?? '';
 
     // ✨ THAY ĐỔI 2: Xây dựng URL động với projectId
-    final url = Uri.parse(
-        'https://10.0.2.2:7128/api/documents/shared-to-me/project/${widget.projectId}');
+    final url = UriHelper.build('/documents/shared-to-me/project/${widget.projectId}');
 
     try {
       final response = await http.get(

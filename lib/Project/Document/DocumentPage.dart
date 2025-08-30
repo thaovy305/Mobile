@@ -290,6 +290,7 @@ class DocumentListView extends StatelessWidget {
                             documentId: detail['id'],
                             title: detail['title'] ?? 'Untitled',
                             content: detail['content'] ?? '',
+                            visibility: detail['visibility'] ?? tabType,
                           ),
                         ),
                       ).then((_) {
@@ -698,6 +699,7 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
                 documentId: documentId,
                 title: title,
                 content: "",
+                visibility: type,
               ),
             ),
           ).then((_) => _fetchAndFilterDocuments(showLoading: false));

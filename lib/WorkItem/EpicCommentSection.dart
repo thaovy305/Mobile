@@ -205,7 +205,7 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
       return;
     }
 
-    final uri = UriHelper.build('/activitylog/project/${epicData!.projectId}');
+    final uri = UriHelper.build('/activitylog/epic/${epicData!.id}');
     try {
       final response = await http.get(uri);
       if (response.statusCode == 200) {

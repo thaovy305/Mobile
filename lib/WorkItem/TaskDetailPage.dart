@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,7 +10,6 @@ import '../Helper/UriHelper.dart';
 import '../Models/Epic.dart';
 import '../Models/Subtask.dart';
 import '../Models/Task.dart';
-
 import '../Models/TaskAssignment.dart';
 import '../Models/TaskFile.dart';
 import 'CommentSection.dart';
@@ -75,7 +76,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           showError("No subtask data");
         }
       } else {
-        showError("Failed to fetch subtasks: ${response.statusCode}");
+        //showError("Failed to fetch subtasks: ${response.statusCode}");
       }
     } catch (e) {
       showError("Error fetching subtasks: $e");
@@ -158,6 +159,183 @@ class _TaskDetailPage extends State<TaskDetailPage> {
       }
     } catch (e) {
       print("Failed to load attachments: $e");
+    } finally {
+      setState(() {
+        _isLoadingAttachments = false;
+      });
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    // Show dialog to choose between camera, gallery, or file picker
+    final source = await showModalBottomSheet<ImageSource?>(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Take a Photo'),
+            onTap: () => Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Choose from Gallery'),
+            onTap: () => Navigator.pop(context, ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.attach_file),
+            title: const Text('Choose a File'),
+            onTap: () => Navigator.pop(context, null), // Use file picker
+          ),
+        ],
+      ),
+    );
+
+    try {
+      PlatformFile? file;
+      String? fileName;
+
+      if (source != null) {
+        // Use image_picker for camera or gallery
+        final ImagePicker _picker = ImagePicker();
+        final XFile? image = await _picker.pickImage(source: source);
+        if (image == null) {
+          print('No image selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No image selected')),
+          );
+          return;
+        }
+        file = PlatformFile(
+          name: image.name,
+          path: image.path,
+          size: await image.length(),
+        );
+        fileName = image.name;
+      } else {
+        // Use file_picker for other files
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) {
+          print('No file selected');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+          return;
+        }
+        file = result.files.first;
+        fileName = file.name;
+      }
+
+      if (file.path == null && file.bytes == null) {
+        print('Error: Both file.path and file.bytes are null');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Selected file has no valid path or data')),
+        );
+        return;
+      }
+
+      // Get accountId from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final accountId = prefs.getInt('accountId');
+      print('Account ID: $accountId');
+
+      if (accountId == null) {
+        print('Error: accountId not found in SharedPreferences');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      // Prepare the multipart request
+      final uri = UriHelper.build('/taskfile/upload');
+      print('API URL: $uri');
+      var request = http.MultipartRequest('POST', uri);
+
+      // Add headers
+      request.headers['accept'] = '*/*';
+      request.headers['Content-Type'] = 'multipart/form-data';
+
+      // Add authentication token if available
+      final token = prefs.getString('accessToken');
+      if (token != null) {
+        print('Adding Bearer token to headers');
+        request.headers['Authorization'] = 'Bearer $token';
+      } else {
+        print('Warning: No access token found in SharedPreferences');
+      }
+
+      // Add form fields
+      request.fields['taskId'] = widget.taskId;
+      request.fields['title'] = fileName;
+      request.fields['createdBy'] = accountId.toString();
+      print('Form fields: ${request.fields}');
+
+      // Add the file
+      if (file.path != null) {
+        print('Using file.path to upload');
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            file.path!,
+            filename: fileName,
+          ),
+        );
+      } else if (file.bytes != null) {
+        print('Using file.bytes to upload');
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            file.bytes!,
+            filename: fileName,
+          ),
+        );
+      }
+
+      // Send the request
+      setState(() {
+        _isLoadingAttachments = true;
+      });
+      print('Sending multipart request...');
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+      print('Response status: ${response.statusCode}');
+      print('Response body: $responseBody');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonResponse = jsonDecode(responseBody);
+        print('Parsed JSON response: $jsonResponse');
+
+        if (jsonResponse['isSuccess'] == true ||
+            (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File uploaded successfully')),
+          );
+          // Refresh the attachment list
+          await _fetchTaskFiles();
+        } else {
+          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
+        );
+      }
+    } catch (e) {
+      print('Error uploading file: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading file: $e')),
+      );
     } finally {
       setState(() {
         _isLoadingAttachments = false;
@@ -733,70 +911,66 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                   await _fetchTaskFiles();
                 }
               },
-              child:
-                  _isAttachmentsExpanded
-                      ? _isLoadingAttachments
-                          ? const Center(child: CircularProgressIndicator())
-                          : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              child: _isAttachmentsExpanded
+                  ? _isLoadingAttachments
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ..._taskFiles.map(
+                        (file) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          launchUrl(Uri.parse(file.urlFile));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              ..._taskFiles.map(
-                                (file) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                  ),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      launchUrl(Uri.parse(file.urlFile));
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.insert_drive_file,
-                                            color: Colors.blue,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  file.title,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
+                              const Icon(
+                                Icons.insert_drive_file,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      file.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 4),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  // Thêm chức năng upload
-                                },
-                                icon: const Icon(Icons.add),
-                                label: const Text("Add attachment"),
-                              ),
                             ],
-                          )
-                      : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _uploadFile, // Updated to call _uploadFile
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add attachment"),
+                  ),
+                ],
+              )
+                  : const SizedBox.shrink(),
             ),
 
             buildCard(

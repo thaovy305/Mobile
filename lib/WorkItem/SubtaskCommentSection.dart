@@ -14,10 +14,10 @@ class SubtaskCommentSection extends StatefulWidget {
   const SubtaskCommentSection({super.key, required this.subtaskId});
 
   @override
-  State<SubtaskCommentSection> createState() => _SubtaskCommentSectionState();
+  State<SubtaskCommentSection> createState() => SubtaskCommentSectionState();
 }
 
-class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
+class SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   String selectedActivity = 'Comments';
   List<SubtaskComment> comments = [];
   List<String> activities = ['Comments', 'History'];
@@ -38,8 +38,18 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   }
 
   Future<void> fetchComments() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
     final url = UriHelper.build('/subtaskcomment/by-subtask/${widget.subtaskId}');
-    final response = await http.get(url, headers: {'accept': '*/*'});
+    final response = await http.get(
+      url,
+      headers: {
+        'accept': '*/*',
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonMap = jsonDecode(response.body);
@@ -61,17 +71,14 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
         }
       });
     } else {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('Failed to fetch comment: ${response.statusCode}'),
-      //   ),
-      // );
+      print('Failed to fetch comment: ${response.statusCode}');
     }
   }
 
   Future<void> _createCommentSubtask(String content) async {
     final prefs = await SharedPreferences.getInstance();
     final createdBy = prefs.getInt('accountId');
+    final token = prefs.getString('accessToken');
 
     if (createdBy == null) {
       ScaffoldMessenger.of(
@@ -83,7 +90,11 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
     final url = UriHelper.build('/subtaskcomment');
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({
         "subtaskId": widget.subtaskId,
         "accountId": createdBy,
@@ -107,10 +118,24 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   }
 
   Future<void> deleteComment(int commentId, int createdBy) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Token not found')),
+      );
+      return;
+    }
+
     final uri = UriHelper.build('/subtaskcomment/$commentId');
     final response = await http.delete(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+        'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({'createdBy': createdBy}),
     );
 
@@ -131,7 +156,14 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   Future<void> updateComment(int commentId, String updatedContent) async {
     final prefs = await SharedPreferences.getInstance();
     final accountId = prefs.getInt('accountId');
-    if (accountId == null) return;
+    final token = prefs.getString('accessToken');
+
+    if (accountId == null || token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AccountId or Token not found')),
+      );
+      return;
+    }
 
     final comment = comments.firstWhere(
           (c) => c.id == commentId,
@@ -139,7 +171,11 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
 
     final response = await http.put(
       UriHelper.build('/subtaskcomment/$commentId'),
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+        'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({
         "subtaskId": comment.subtaskId,
         "accountId": accountId,
@@ -149,12 +185,11 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
     );
 
     if (response.statusCode == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Updated comment')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Updated comment')),
+      );
       await fetchComments();
       await fetchActivityLogs();
-
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Updated error: ${response.statusCode}')),
@@ -163,9 +198,20 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
   }
 
   Future<void> fetchActivityLogs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
     final uri = UriHelper.build('/activitylog/subtask/${widget.subtaskId}');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         final List<dynamic> data = jsonData['data'];
@@ -428,6 +474,8 @@ class _SubtaskCommentSectionState extends State<SubtaskCommentSection> {
                                           comment.id,
                                           currentUserId!,
                                         );
+                                        await fetchComments();
+                                        await fetchActivityLogs();
                                       }
                                     },
                                     icon: const Icon(

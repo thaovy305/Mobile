@@ -45,14 +45,26 @@ class _LoginPageState extends State<LoginPage> {
         final username = data['data']['username'];
         final accountId = data['data']['id'];
         final email = data['data']['email'];
+        final role = data['data']['role'];
 
+        // Check if the role is ADMIN or CLIENT
+        if (role == 'ADMIN' || role == 'CLIENT') {
+          setState(() {
+            _errorMessage = 'Access denied for ADMIN and CLIENT roles';
+            _isLoading = false;
+          });
+          return; // Prevent navigation and saving to SharedPreferences
+        }
+
+        // Save user details to SharedPreferences for allowed roles
         final prefs = await SharedPreferences.getInstance();
-
         await prefs.setString('username', username);
         await prefs.setString('accessToken', token);
         await prefs.setInt('accountId', accountId);
         await prefs.setString('email', email);
+        await prefs.setString('userRole', role);
 
+        // Navigate to MainScreen for allowed roles
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => MainScreen()),
@@ -88,17 +100,16 @@ class _LoginPageState extends State<LoginPage> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.blue, // ✅ màu xanh đậm giống logo
+                  color: Colors.blue,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(8), // Tuỳ chỉnh để logo nhỏ gọn
+                  padding: const EdgeInsets.all(8),
                   child: Image.asset(
                     'assets/Logo_IntelliPM_chutrang-removebg-preview.png',
                     fit: BoxFit.contain,
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
               const Text(
                 'Welcome to IntelliPM',
@@ -153,8 +164,10 @@ class _LoginPageState extends State<LoginPage> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
-                Text(_errorMessage!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                ),
               ],
               const SizedBox(height: 24),
               SizedBox(
@@ -164,15 +177,20 @@ class _LoginPageState extends State<LoginPage> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     backgroundColor: Colors.blue,
-
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Login',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
+                      : const Text(
+                    'Login',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],

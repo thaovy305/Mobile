@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intelli_pm/Meeting/MeetingPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'HomePage.dart';
 import 'Project/ProjectListByAccountPage.dart';
 import 'BottomNavBar.dart';
-
+import 'AllWork/AllWorkMain.dart';
+import 'WorkItem/NotificationPage.dart';
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -15,6 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   String _username = 'User';
   bool _isLoading = true;
   int _currentIndex = 0;
+  int _unreadCount = 0;
 
   @override
   void initState() {
@@ -30,13 +33,25 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _updateUnreadCount(int count) {
+    setState(() {
+      _unreadCount = count;
+    });
+  }
+
+  // void _onNavBarTap(int index) {
+  //   if (index == 0 || index == 1) {
+  //     setState(() {
+  //       _currentIndex = index;
+  //     });
+  //   }
+  //   // Các tab khác (2, 3, 4) không làm gì vì chưa có trang
+  // }
+
   void _onNavBarTap(int index) {
-    if (index == 0 || index == 1) {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
-    // Các tab khác (2, 3, 4) không làm gì vì chưa có trang
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -52,15 +67,17 @@ class _MainScreenState extends State<MainScreen> {
                 children: [
                   HomePage(),
                   ProjectListByAccountPage(username: _username),
-                  const Center(child: Text('All work - Chưa triển khai')),
-                  const Center(child: Text('Dashboards - Chưa triển khai')),
-                  const Center(child: Text('Notifications - Chưa triển khai')),
+
+                  AllWorkMain(),
+                  MeetingPage(),
+                  NotificationPage(onUnreadCountChanged: _updateUnreadCount),
                 ],
               ),
       bottomNavigationBar: BottomNavBar(
         username: _username,
         currentIndex: _currentIndex,
-        onTap: _onNavBarTap, // Thêm tham số onTap
+        unreadCount: _unreadCount,
+        onTap: _onNavBarTap,
       ),
     );
   }

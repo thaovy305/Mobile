@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Helper/UriHelper.dart';
 import '../../Models/Sprint.dart';
 import 'TaskCard.dart';
@@ -29,6 +30,20 @@ class _SprintBoardState extends State<SprintBoard> {
     fetchSprints();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        errorMessage = 'Credentials not found in preferences';
+        isLoading = false;
+      });
+      return false;
+    }
+    return true;
+  }
+
   Future<void> fetchSprints() async {
     setState(() {
       isLoading = true;
@@ -36,20 +51,25 @@ class _SprintBoardState extends State<SprintBoard> {
     });
 
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/sprint/by-project-id-with-tasks?projectKey=${widget.projectKey}');
-      print('Fetching sprints from: $uri');
+
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        if (jsonBody['isSuccess'] == true) {
+        if (jsonBody['isSuccess'] == true && jsonBody['data'] is List) {
           final data = jsonBody['data'] as List;
           setState(() {
             sprints = data.map((sprintJson) => Sprint.fromJson(sprintJson)).toList();
@@ -76,16 +96,22 @@ class _SprintBoardState extends State<SprintBoard> {
   }
 
   Future<void> deleteSprint(int sprintId) async {
-    final uri = UriHelper.build('/sprint/$sprintId/with-task');
     try {
-      print('Deleting sprint from: $uri');
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/$sprintId/with-task');
+
       final response = await http.delete(
         uri,
         headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -114,33 +140,37 @@ class _SprintBoardState extends State<SprintBoard> {
   }
 
   Future<void> updateSprint(int sprintId, String name, String goal, DateTime startDate, DateTime endDate) async {
-    print('Updating sprint with id: $sprintId');
-    final uri = UriHelper.build('/sprint/$sprintId');
-    final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
-    final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
-    final sprint = sprints.firstWhere((s) => s.id == sprintId, orElse: () => throw Exception('Sprint with id $sprintId not found'));
-    final body = jsonEncode({
-      'projectId': sprint.projectId,
-      'name': name,
-      'goal': goal.isEmpty ? null : goal,
-      'startDate': formattedStartDate,
-      'endDate': formattedEndDate,
-      'plannedStartDate': formattedStartDate,
-      'plannedEndDate': formattedEndDate,
-      'status': sprint.status,
-    });
-    print('Updating sprint to: $uri with body: $body');
-
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/$sprintId');
+      final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
+      final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
+      final sprint = sprints.firstWhere((s) => s.id == sprintId, orElse: () => throw Exception('Sprint with id $sprintId not found'));
+      final body = jsonEncode({
+        'projectId': sprint.projectId,
+        'name': name,
+        'goal': goal.isEmpty ? null : goal,
+        'startDate': formattedStartDate,
+        'endDate': formattedEndDate,
+        'plannedStartDate': formattedStartDate,
+        'plannedEndDate': formattedEndDate,
+        'status': sprint.status,
+      });
+
+
       final response = await http.put(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
         body: body,
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -168,6 +198,45 @@ class _SprintBoardState extends State<SprintBoard> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Network error occurred or sprint not found')),
+      );
+    }
+  }
+
+  Future<void> updateTaskSprint(String taskId, int sprintId) async {
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/task/$taskId/sprint');
+
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: jsonEncode(sprintId),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          await fetchSprints(); // Refresh sprint list
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update task: ${jsonBody['message']}')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error occurred')),
       );
     }
   }
@@ -488,135 +557,152 @@ class _SprintBoardState extends State<SprintBoard> {
       return Center(child: Text(errorMessage!, style: const TextStyle(color: Colors.red)));
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: sprints.map((sprint) {
-          final sprintId = sprint.id;
-          final isExpanded = expandedSprints[sprintId] ?? true;
-          final workItemCount = sprint.tasks?.length ?? 0;
-          final displayName = sprint.status == 'ACTIVE' ? '${sprint.name} (Active)' : sprint.name;
+    return DragTarget<String>(
+      builder: (context, candidateData, rejectedData) {
+        return NotificationListener<ScrollNotification>(
+          onNotification: (scrollNotification) {
+            // Prevent DragTarget sensitivity during scrolling
+            return false;
+          },
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: sprints.map((sprint) {
+                final sprintId = sprint.id;
+                final isExpanded = expandedSprints[sprintId] ?? true;
+                final workItemCount = sprint.tasks?.length ?? 0;
+                final displayName = sprint.status == 'ACTIVE' ? '${sprint.name} (Active)' : sprint.name;
 
-          return Card(
-            color: Colors.white,
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        expandedSprints[sprintId] = !isExpanded;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            isExpanded ? Icons.expand_less : Icons.expand_more,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  displayName ?? 'Unnamed Sprint',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                return DragTarget<String>(
+                  onWillAccept: (data) => sprint.status != 'COMPLETED', // Reject if sprint is completed
+                  onAccept: (taskId) => updateTaskSprint(taskId, sprintId),
+                  builder: (context, candidateData, rejectedData) {
+                    return Card(
+                      color: Colors.white,
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  expandedSprints[sprintId] = !isExpanded;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 12.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayName ?? 'Unnamed Sprint',
+                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '$workItemCount work items',
+                                            style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Display "Completed" or PopupMenuButton based on status
+                                    sprint.status == 'COMPLETED'
+                                        ? const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                      child: Text(
+                                        'Completed',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    )
+                                        : PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'start' && sprint.status != "ACTIVE") {
+                                          _showStartSprintBottomSheet(sprintId, sprint, workItemCount);
+                                        } else if (value == 'complete' && sprint.status == "ACTIVE") {
+                                          _showCompleteSprintBottomSheet(sprintId, sprint, workItemCount);
+                                        } else if (value == 'update') {
+                                          _showUpdateSprintDialog(sprintId, sprint, workItemCount);
+                                        } else if (value == 'delete') {
+                                          _showDeleteConfirmationDialog(sprintId, sprint.name);
+                                        }
+                                      },
+                                      position: PopupMenuPosition.under,
+                                      itemBuilder: (BuildContext context) => [
+                                        if (sprint.status != "ACTIVE" && sprint.tasks != null && sprint.tasks!.isNotEmpty)
+                                          const PopupMenuItem<String>(
+                                            value: 'start',
+                                            child: Text('Start Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                                          ),
+                                        if (sprint.status == "ACTIVE")
+                                          const PopupMenuItem<String>(
+                                            value: 'complete',
+                                            child: Text('Complete Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                                          ),
+                                        const PopupMenuItem<String>(
+                                          value: 'update',
+                                          child: Text('Update Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                                        ),
+                                        if (sprint.status != "ACTIVE")
+                                          const PopupMenuItem<String>(
+                                            value: 'delete',
+                                            child: Text('Delete Sprint', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
+                                          ),
+                                      ],
+                                      icon: const Icon(Icons.more_vert),
+                                      tooltip: 'Sprint actions',
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$workItemCount work items',
-                                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Hiển thị "Completed" hoặc PopupMenuButton tùy theo trạng thái
-                          sprint.status == 'COMPLETED'
-                              ? const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                            child: Text(
-                              'Completed',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.green,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          )
-                              : PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'start' && sprint.status != "ACTIVE") {
-                                _showStartSprintBottomSheet(sprintId, sprint, workItemCount);
-                              } else if (value == 'complete' && sprint.status == "ACTIVE") {
-                                _showCompleteSprintBottomSheet(sprintId, sprint, workItemCount);
-                              } else if (value == 'update') {
-                                _showUpdateSprintDialog(sprintId, sprint, workItemCount);
-                              } else if (value == 'delete') {
-                                _showDeleteConfirmationDialog(sprintId, sprint.name);
-                              }
-                            },
-                            position: PopupMenuPosition.under,
-                            itemBuilder: (BuildContext context) => [
-                              if (sprint.status != "ACTIVE" && sprint.tasks != null && sprint.tasks!.isNotEmpty)
-                                const PopupMenuItem<String>(
-                                  value: 'start',
-                                  child: Text('Start Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
-                                ),
-                              if (sprint.status == "ACTIVE")
-                                const PopupMenuItem<String>(
-                                  value: 'complete',
-                                  child: Text('Complete Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
-                                ),
-                              const PopupMenuItem<String>(
-                                value: 'update',
-                                child: Text('Update Sprint', style: TextStyle(fontSize: 14, color: Colors.black87)),
-                              ),
-                              if (sprint.status != "ACTIVE")
-                                const PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: Text('Delete Sprint', style: TextStyle(fontSize: 14, color: Colors.redAccent)),
-                                ),
-                            ],
-                            icon: const Icon(Icons.more_vert),
-                            tooltip: 'Sprint actions',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  if (isExpanded && sprint.tasks != null)
-                    ...List.generate(sprint.tasks!.length, (index) {
-                      final task = sprint.tasks![index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: TaskCard(
-                          title: task.title,
-                          code: task.id,
-                          status: task.status ?? 'Unknown',
-                          epicLabel: task.epicName,
-                          isDone: task.status?.toUpperCase() == 'DONE',
-                          taskAssignments: task.taskAssignments,
-                          type: task.type,
+                            const SizedBox(height: 8.0),
+                            if (isExpanded && sprint.tasks != null)
+                              ...List.generate(sprint.tasks!.length, (index) {
+                                final task = sprint.tasks![index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: TaskCard(
+                                    title: task.title,
+                                    code: task.id,
+                                    status: task.status ?? 'Unknown',
+                                    epicLabel: task.epicName,
+                                    isDone: task.status?.toUpperCase() == 'DONE',
+                                    taskAssignments: task.taskAssignments,
+                                    type: task.type,
+                                    sprintStatus: sprint.status, // Pass sprint status
+                                  ),
+                                );
+                              }),
+                          ],
                         ),
-                      );
-                    }),
-                ],
-              ),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      },
     );
   }
 

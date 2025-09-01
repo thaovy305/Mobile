@@ -2,7 +2,7 @@ name: intelli_pm
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -42,9 +42,21 @@ dependencies:
   url_launcher: ^6.3.2
   image_picker: ^1.1.2
   path: ^1.9.1
-  file_picker: ^10.2.0
+  file_picker: ^10.3.1
   dio: ^5.8.0+1
+  fl_chart: ^0.64.0
   intl: ^0.20.2
+  table_calendar: ^3.0.9
+  flutter_localization: ^0.3.3
+  flutter_quill: ^11.4.2
+  flutter_quill_extensions: ^11.0.0
+  flutter_inappwebview: ^6.1.5
+  flutter_widget_from_html: ^0.17.0
+  flutter_quill_delta_from_html: ^1.5.3
+  flutter_html: ^3.0.0
+  html_editor_enhanced: ^2.7.1
+  html: ^0.15.4
+
 
 dev_dependencies:
   flutter_test:
@@ -62,8 +74,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

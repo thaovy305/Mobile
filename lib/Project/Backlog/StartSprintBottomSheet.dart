@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Models/Sprint.dart';
 import '../../Helper/UriHelper.dart';
 
@@ -37,6 +38,7 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
   String selectedDuration = '1 week';
   final List<String> durations = ['1 week', '2 weeks', '3 weeks'];
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -46,33 +48,54 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
     sprintName = widget.sprint.name ?? '';
   }
 
-  Future<void> updateSprint(int sprintId, String name, String goal, DateTime startDate, DateTime endDate) async {
-    print('Updating sprint with id: $sprintId');
-    final uri = UriHelper.build('/sprint/$sprintId');
-    final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
-    final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
-    final body = jsonEncode({
-      'projectId': widget.sprint.projectId,
-      'name': name,
-      'goal': goal.isEmpty ? null : goal,
-      'startDate': formattedStartDate,
-      'endDate': formattedEndDate,
-      'plannedStartDate': formattedStartDate,
-      'plannedEndDate': formattedEndDate,
-      'status': 'ACTIVE',
-    });
-    print('Updating sprint to: $uri with body: $body');
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        _errorMessage = 'Credentials not found in preferences';
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credentials not found in preferences')),
+      );
+      return false;
+    }
+    return true;
+  }
 
+  Future<void> updateSprint(int sprintId, String name, String goal, DateTime startDate, DateTime endDate) async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/$sprintId');
+      final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
+      final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
+      final body = jsonEncode({
+        'projectId': widget.sprint.projectId,
+        'name': name,
+        'goal': goal.isEmpty ? null : goal,
+        'startDate': formattedStartDate,
+        'endDate': formattedEndDate,
+        'plannedStartDate': formattedStartDate,
+        'plannedEndDate': formattedEndDate,
+        'status': 'ACTIVE',
+      });
+
+
       final response = await http.put(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
         body: body,
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -81,16 +104,25 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
             const SnackBar(content: Text('Sprint updated successfully')),
           );
         } else {
+          setState(() {
+            _errorMessage = jsonBody['message'] ?? 'Failed to update sprint';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to update sprint: ${jsonBody['message']}')),
           );
         }
       } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Server error: ${response.statusCode}')),
         );
       }
     } catch (e) {
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Network error occurred or sprint not found')),
       );
@@ -125,6 +157,9 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
 
   Future<void> _handleConfirm() async {
     if (_startDate.isAfter(_endDate)) {
+      setState(() {
+        _errorMessage = 'Start date must be before end date';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Start date must be before end date')),
       );
@@ -133,6 +168,7 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
 
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
@@ -140,6 +176,9 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
       await widget.onTaskUpdated();
       if (mounted) Navigator.pop(context);
     } catch (e) {
+      setState(() {
+        _errorMessage = 'Error: $e';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -175,6 +214,16 @@ class _StartSprintBottomSheetState extends State<StartSprintBottomSheet> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
+
+          // Error message display
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
 
           // Header with button
           Row(

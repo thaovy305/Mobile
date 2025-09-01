@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Helper/UriHelper.dart';
 import '../../Models/Task.dart';
 import 'TaskCard.dart';
@@ -28,15 +29,28 @@ class _BacklogBoardState extends State<BacklogBoard> {
   Future<void> fetchBacklogTasks() async {
     setState(() {
       isLoading = true;
-      errorMessage = null;
+      errorMessage = '';
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString('email') ?? '';
+      final token = prefs.getString('accessToken') ?? '';
+
+      if (email.isEmpty) {
+        setState(() {
+          errorMessage = 'Email not found in preferences';
+          isLoading = false;
+        });
+        return;
+      }
+
       final uri = UriHelper.build('/task/backlog?projectKey=${widget.projectKey}');
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
       );
@@ -69,15 +83,27 @@ class _BacklogBoardState extends State<BacklogBoard> {
     }
   }
 
+
   Future<void> updateTaskSprint(String taskId, int sprintId) async {
     final uri = UriHelper.build('/task/$taskId/sprint');
     try {
-      print('Updating task $taskId to sprint $sprintId: $uri');
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString('email') ?? '';
+      final token = prefs.getString('accessToken') ?? '';
+
+      if (email.isEmpty) {
+        setState(() {
+          errorMessage = 'Email not found in preferences';
+          isLoading = false;
+        });
+        return;
+      }
       final response = await http.patch(
         uri,
         headers: {
-          'Accept': '*/*',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
         },
         body: jsonEncode(sprintId),
       );

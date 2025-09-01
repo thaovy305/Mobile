@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Models/Sprint.dart';
 import '../../Helper/UriHelper.dart';
 
@@ -42,32 +43,54 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
   @override
   void initState() {
     super.initState();
-    print('Initializing CompleteSprintBottomSheet for sprintId: ${widget.sprintId}');
+
     if (widget.projectId > 0) {
       _fetchSprints();
     }
     _fetchCurrentSprint();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        _sprintsError = 'Credentials not found in preferences';
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credentials not found in preferences')),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _fetchSprints() async {
     setState(() {
       _isLoading = true;
+      _sprintsError = null;
     });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/sprint/by-project-id?projectId=${widget.projectId}');
-      print('Fetching sprints from: $uri');
+
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
-          // 'Authorization': 'Bearer your_token_here', // Thêm nếu cần
         },
       );
-      print('Fetch sprints response: ${response.statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        if (jsonBody['isSuccess'] == true) {
+        if (jsonBody['isSuccess'] == true && jsonBody['data'] is List) {
           final sprints = (jsonBody['data'] as List).map((s) => Sprint.fromJson(s)).toList();
           setState(() {
             _sprints = sprints.where((s) => s.id != widget.sprintId && s.status != 'COMPLETED').toList();
@@ -101,19 +124,24 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
   Future<void> _fetchCurrentSprint() async {
     setState(() {
       _isLoading = true;
+      _sprintError = null;
     });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/sprint/${widget.sprintId}');
-      print('Fetching current sprint from: $uri');
+
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
-          // 'Authorization': 'Bearer your_token_here', // Thêm nếu cần
         },
       );
-      print('Fetch current sprint response: ${response.statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
         if (jsonBody['isSuccess'] == true) {
@@ -142,50 +170,65 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
   }
 
   Future<void> _moveTasks(String type, int sprintNewId) async {
-    final uri = UriHelper.build('/sprint/move-tasks');
-    final body = jsonEncode({
-      'sprintOldId': widget.sprintId,
-      'sprintNewId': sprintNewId,
-      'type': type,
-    });
-    print('Moving tasks to: $uri with body: $body');
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-        // 'Authorization': 'Bearer your_token_here', // Thêm nếu cần
-      },
-      body: body,
-    );
-    print('Move tasks response: ${response.statusCode}, body: ${response.body}');
-    if (response.statusCode != 200) {
-      final jsonBody = json.decode(response.body);
-      throw Exception(jsonBody['message'] ?? 'Failed to move tasks: ${response.statusCode}');
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/move-tasks');
+      final body = jsonEncode({
+        'sprintOldId': widget.sprintId,
+        'sprintNewId': sprintNewId,
+        'type': type,
+      });
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        final jsonBody = json.decode(response.body);
+        throw Exception(jsonBody['message'] ?? 'Failed to move tasks: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to move tasks: $e');
     }
   }
 
   Future<void> _updateSprintStatus() async {
-    final uri = UriHelper.build('/sprint/${widget.sprintId}/status');
-    print('Updating sprint status to: $uri with body: "COMPLETED"');
-    final response = await http.patch(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-        // 'Authorization': 'Bearer your_token_here', // Thêm nếu cần
-      },
-      body: '"COMPLETED"',
-    );
-    print('Update sprint status response: ${response.statusCode}, body: ${response.body}');
-    if (response.statusCode != 200) {
-      final jsonBody = json.decode(response.body);
-      throw Exception(jsonBody['message'] ?? 'Failed to update sprint status: ${response.statusCode}');
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/${widget.sprintId}/status');
+
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: '"COMPLETED"',
+      );
+
+      if (response.statusCode != 200) {
+        final jsonBody = json.decode(response.body);
+        throw Exception(jsonBody['message'] ?? 'Failed to update sprint status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to update sprint status: $e');
     }
   }
 
   Future<void> _handleConfirmMove() async {
-    print('Handling confirm move for sprintId: ${widget.sprintId}, selectedTarget: $_selectedTarget');
     if (_selectedTarget == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a target sprint or option')),
@@ -228,6 +271,8 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
     if (confirmed == true) {
       setState(() {
         _isConfirming = true;
+        _sprintsError = null;
+        _sprintError = null;
       });
       try {
         String type;
@@ -246,7 +291,10 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
         await widget.onTaskUpdated();
         if (mounted) Navigator.pop(context);
       } catch (e) {
-        print('Error in handleConfirmMove: $e');
+
+        setState(() {
+          _sprintError = 'Failed to complete sprint: $e';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to complete sprint: $e')),
         );
@@ -271,8 +319,15 @@ class _CompleteSprintBottomSheetState extends State<CompleteSprintBottomSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Gradient header
-
+          // Error messages
+          if (_sprintsError != null || _sprintError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _sprintsError ?? _sprintError ?? 'Unknown error',
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
           // Image
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 16),

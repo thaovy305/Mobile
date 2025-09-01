@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Helper/UriHelper.dart';
 import '../../Models/Sprint.dart';
 import 'TaskCard.dart';
@@ -29,6 +30,20 @@ class _SprintBoardState extends State<SprintBoard> {
     fetchSprints();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        errorMessage = 'Credentials not found in preferences';
+        isLoading = false;
+      });
+      return false;
+    }
+    return true;
+  }
+
   Future<void> fetchSprints() async {
     setState(() {
       isLoading = true;
@@ -36,20 +51,25 @@ class _SprintBoardState extends State<SprintBoard> {
     });
 
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/sprint/by-project-id-with-tasks?projectKey=${widget.projectKey}');
-      print('Fetching sprints from: $uri');
+
       final response = await http.get(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        if (jsonBody['isSuccess'] == true) {
+        if (jsonBody['isSuccess'] == true && jsonBody['data'] is List) {
           final data = jsonBody['data'] as List;
           setState(() {
             sprints = data.map((sprintJson) => Sprint.fromJson(sprintJson)).toList();
@@ -76,16 +96,22 @@ class _SprintBoardState extends State<SprintBoard> {
   }
 
   Future<void> deleteSprint(int sprintId) async {
-    final uri = UriHelper.build('/sprint/$sprintId/with-task');
     try {
-      print('Deleting sprint from: $uri');
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/$sprintId/with-task');
+
       final response = await http.delete(
         uri,
         headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -114,33 +140,37 @@ class _SprintBoardState extends State<SprintBoard> {
   }
 
   Future<void> updateSprint(int sprintId, String name, String goal, DateTime startDate, DateTime endDate) async {
-    print('Updating sprint with id: $sprintId');
-    final uri = UriHelper.build('/sprint/$sprintId');
-    final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
-    final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
-    final sprint = sprints.firstWhere((s) => s.id == sprintId, orElse: () => throw Exception('Sprint with id $sprintId not found'));
-    final body = jsonEncode({
-      'projectId': sprint.projectId,
-      'name': name,
-      'goal': goal.isEmpty ? null : goal,
-      'startDate': formattedStartDate,
-      'endDate': formattedEndDate,
-      'plannedStartDate': formattedStartDate,
-      'plannedEndDate': formattedEndDate,
-      'status': sprint.status,
-    });
-    print('Updating sprint to: $uri with body: $body');
-
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/sprint/$sprintId');
+      final formattedStartDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(startDate.toUtc());
+      final formattedEndDate = DateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(endDate.toUtc());
+      final sprint = sprints.firstWhere((s) => s.id == sprintId, orElse: () => throw Exception('Sprint with id $sprintId not found'));
+      final body = jsonEncode({
+        'projectId': sprint.projectId,
+        'name': name,
+        'goal': goal.isEmpty ? null : goal,
+        'startDate': formattedStartDate,
+        'endDate': formattedEndDate,
+        'plannedStartDate': formattedStartDate,
+        'plannedEndDate': formattedEndDate,
+        'status': sprint.status,
+      });
+
+
       final response = await http.put(
         uri,
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
           'Accept': '*/*',
         },
         body: body,
       );
-      print('Response status: ${response.statusCode}, body: ${response.body}');
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -173,22 +203,27 @@ class _SprintBoardState extends State<SprintBoard> {
   }
 
   Future<void> updateTaskSprint(String taskId, int sprintId) async {
-    final uri = UriHelper.build('/task/$taskId/sprint');
     try {
-      print('Updating task $taskId to sprint $sprintId: $uri');
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/task/$taskId/sprint');
+
       final response = await http.patch(
         uri,
         headers: {
-          'Accept': '*/*',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
         },
         body: jsonEncode(sprintId),
       );
-      print('Update task response: ${response.statusCode}, body: ${response.body}');
+
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
         if (jsonBody['isSuccess'] == true) {
-          await fetchSprints(); // Làm mới danh sách sprint
+          await fetchSprints(); // Refresh sprint list
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to update task: ${jsonBody['message']}')),
@@ -526,7 +561,7 @@ class _SprintBoardState extends State<SprintBoard> {
       builder: (context, candidateData, rejectedData) {
         return NotificationListener<ScrollNotification>(
           onNotification: (scrollNotification) {
-            // Ngăn chặn DragTarget nhạy khi cuộn
+            // Prevent DragTarget sensitivity during scrolling
             return false;
           },
           child: SingleChildScrollView(
@@ -540,7 +575,7 @@ class _SprintBoardState extends State<SprintBoard> {
                 final displayName = sprint.status == 'ACTIVE' ? '${sprint.name} (Active)' : sprint.name;
 
                 return DragTarget<String>(
-                  onWillAccept: (data) => sprint.status != 'COMPLETED', // Từ chối nếu sprint đã hoàn thành
+                  onWillAccept: (data) => sprint.status != 'COMPLETED', // Reject if sprint is completed
                   onAccept: (taskId) => updateTaskSprint(taskId, sprintId),
                   builder: (context, candidateData, rejectedData) {
                     return Card(
@@ -585,7 +620,7 @@ class _SprintBoardState extends State<SprintBoard> {
                                         ],
                                       ),
                                     ),
-                                    // Hiển thị "Completed" hoặc PopupMenuButton tùy theo trạng thái
+                                    // Display "Completed" or PopupMenuButton based on status
                                     sprint.status == 'COMPLETED'
                                         ? const Padding(
                                       padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -653,7 +688,7 @@ class _SprintBoardState extends State<SprintBoard> {
                                     isDone: task.status?.toUpperCase() == 'DONE',
                                     taskAssignments: task.taskAssignments,
                                     type: task.type,
-                                    sprintStatus: sprint.status, // Truyền trạng thái sprint
+                                    sprintStatus: sprint.status, // Pass sprint status
                                   ),
                                 );
                               }),

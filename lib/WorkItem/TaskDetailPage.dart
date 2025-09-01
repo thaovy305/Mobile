@@ -37,6 +37,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   Epic? epic;
   bool _isCreatingSubtask = false;
   TextEditingController _subtaskController = TextEditingController();
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -46,6 +47,23 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     loadTaskAssignments();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        _errorMessage = 'Credentials not found in preferences';
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credentials not found in preferences')),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<void> loadTaskAssignments() async {
     try {
       final assignments = await fetchTaskAssignments();
@@ -53,40 +71,67 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         taskAssignments = assignments;
       });
     } catch (e) {
-      print("Error loading task assignments: $e");
+
+      setState(() {
+        _errorMessage = 'Error loading task assignments: $e';
+      });
     }
   }
 
   Future<void> fetchSubtasks() async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/subtask/by-task/${widget.taskId}');
-      final response = await http.get(uri);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-        print("Subtask response: $jsonBody"); // ✅ debug
-
         if (jsonBody['isSuccess'] == true && jsonBody['data'] != null) {
           final List data = jsonBody['data'];
-
           setState(() {
             subtasks = data.map((json) => Subtask.fromJson(json)).toList();
+            _errorMessage = null;
           });
         } else {
-          showError("No subtask data");
+          showError(jsonBody['message'] ?? 'No subtask data');
         }
       } else {
-        //showError("Failed to fetch subtasks: ${response.statusCode}");
+        showError('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      showError("Error fetching subtasks: $e");
+      showError('Network error: $e');
     }
   }
 
   Future<void> fetchTaskDetail() async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/task/${widget.taskId}');
-      final response = await http.get(uri);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
+
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -94,13 +139,14 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           setState(() {
             task = Task.fromJson(jsonBody['data']);
             isLoading = false;
+            _errorMessage = null;
           });
 
           if (task?.epicId != null && task!.epicId!.isNotEmpty) {
             await fetchEpicData(task!.epicId!);
           }
         } else {
-          showError(jsonBody['message'] ?? 'task not found');
+          showError(jsonBody['message'] ?? 'Task not found');
         }
       } else {
         showError('Server error: ${response.statusCode}');
@@ -112,53 +158,103 @@ class _TaskDetailPage extends State<TaskDetailPage> {
 
   Future<void> fetchEpicData(String epicId) async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/epic/$epicId');
+
       final response = await http.get(
-        UriHelper.build('/epic/$epicId'),
-        headers: {'accept': '*/*'},
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
       );
 
       if (response.statusCode == 200) {
-        final jsonBody = jsonDecode(response.body);
-        setState(() {
-          epic = Epic.fromJson(jsonBody['data']); // chú ý: phải lấy `data`
-        });
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          setState(() {
+            epic = Epic.fromJson(jsonBody['data']);
+            _errorMessage = null;
+          });
+        } else {
+
+          setState(() {
+            _errorMessage = jsonBody['message'] ?? 'Failed to load epic';
+          });
+        }
       } else {
-        print('Error fetch Epic: ${response.statusCode}');
+
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
       }
     } catch (e) {
-      print('Error: $e');
+
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
     }
   }
 
   void showError(String message) {
-    setState(() => isLoading = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    setState(() {
+      isLoading = false;
+      _errorMessage = message;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _fetchTaskFiles() async {
     setState(() {
       _isLoadingAttachments = true;
+      _errorMessage = null;
     });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/taskfile/by-task/${widget.taskId}');
+
       final response = await http.get(
-        UriHelper.build('/taskfile/by-task/${widget.taskId}'),
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
       );
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         if (jsonData['isSuccess']) {
           final List<TaskFile> files =
-              (jsonData['data'] as List)
-                  .map((e) => TaskFile.fromJson(e))
-                  .toList();
+          (jsonData['data'] as List).map((e) => TaskFile.fromJson(e)).toList();
           setState(() {
             _taskFiles = files;
+            _errorMessage = null;
+          });
+        } else {
+          setState(() {
+            _errorMessage = jsonData['message'] ?? 'Failed to load task files';
           });
         }
+      } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
       }
     } catch (e) {
-      print("Failed to load attachments: $e");
+
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
     } finally {
       setState(() {
         _isLoadingAttachments = false;
@@ -167,41 +263,62 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   }
 
   Future<void> _uploadFile() async {
-    // Show dialog to choose between camera, gallery, or file picker
-    final source = await showModalBottomSheet<ImageSource?>(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.camera_alt),
-            title: const Text('Take a Photo'),
-            onTap: () => Navigator.pop(context, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.pop(context, ImageSource.gallery),
-          ),
-          ListTile(
-            leading: const Icon(Icons.attach_file),
-            title: const Text('Choose a File'),
-            onTap: () => Navigator.pop(context, null), // Use file picker
-          ),
-        ],
-      ),
-    );
-
+    setState(() {
+      _isLoadingAttachments = true;
+      _errorMessage = null;
+    });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final source = await showModalBottomSheet<ImageSource?>(
+        context: context,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Choose a File'),
+              onTap: () => Navigator.pop(context, null),
+            ),
+          ],
+        ),
+      );
+
       PlatformFile? file;
       String? fileName;
 
       if (source != null) {
-        // Use image_picker for camera or gallery
         final ImagePicker _picker = ImagePicker();
         final XFile? image = await _picker.pickImage(source: source);
         if (image == null) {
-          print('No image selected');
+
+          setState(() {
+            _errorMessage = 'No image selected';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No image selected')),
           );
@@ -214,14 +331,16 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         );
         fileName = image.name;
       } else {
-        // Use file_picker for other files
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           type: FileType.any,
           allowMultiple: false,
           withData: true,
         );
         if (result == null || result.files.isEmpty) {
-          print('No file selected');
+
+          setState(() {
+            _errorMessage = 'No file selected';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No file selected')),
           );
@@ -232,53 +351,31 @@ class _TaskDetailPage extends State<TaskDetailPage> {
       }
 
       if (file.path == null && file.bytes == null) {
-        print('Error: Both file.path and file.bytes are null');
+
+        setState(() {
+          _errorMessage = 'Selected file has no valid path or data';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error: Selected file has no valid path or data')),
         );
         return;
       }
 
-      // Get accountId from SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final accountId = prefs.getInt('accountId');
-      print('Account ID: $accountId');
-
-      if (accountId == null) {
-        print('Error: accountId not found in SharedPreferences');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AccountId not found')),
-        );
-        return;
-      }
-
-      // Prepare the multipart request
       final uri = UriHelper.build('/taskfile/upload');
-      print('API URL: $uri');
+
       var request = http.MultipartRequest('POST', uri);
 
-      // Add headers
-      request.headers['accept'] = '*/*';
       request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = '*/*';
 
-      // Add authentication token if available
-      final token = prefs.getString('accessToken');
-      if (token != null) {
-        print('Adding Bearer token to headers');
-        request.headers['Authorization'] = 'Bearer $token';
-      } else {
-        print('Warning: No access token found in SharedPreferences');
-      }
-
-      // Add form fields
       request.fields['taskId'] = widget.taskId;
       request.fields['title'] = fileName;
       request.fields['createdBy'] = accountId.toString();
-      print('Form fields: ${request.fields}');
 
-      // Add the file
+
       if (file.path != null) {
-        print('Using file.path to upload');
+
         request.files.add(
           await http.MultipartFile.fromPath(
             'file',
@@ -287,7 +384,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           ),
         );
       } else if (file.bytes != null) {
-        print('Using file.bytes to upload');
+
         request.files.add(
           http.MultipartFile.fromBytes(
             'file',
@@ -297,42 +394,40 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         );
       }
 
-      // Send the request
-      setState(() {
-        _isLoadingAttachments = true;
-      });
-      print('Sending multipart request...');
 
       var response = await request.send();
       var responseBody = await response.stream.bytesToString();
-      print('Response status: ${response.statusCode}');
-      print('Response body: $responseBody');
+
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final jsonResponse = jsonDecode(responseBody);
-        print('Parsed JSON response: $jsonResponse');
-
+        final jsonResponse = json.decode(responseBody);
         if (jsonResponse['isSuccess'] == true ||
             (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('File uploaded successfully')),
           );
-          // Refresh the attachment list
           await _fetchTaskFiles();
         } else {
-          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+          setState(() {
+            _errorMessage = jsonResponse['message'] ?? 'Upload failed';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
           );
         }
       } else {
-        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
+        setState(() {
+          _errorMessage = 'Upload failed: ${response.reasonPhrase}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
         );
       }
     } catch (e) {
-      print('Error uploading file: $e');
+
+      setState(() {
+        _errorMessage = 'Error uploading file: $e';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error uploading file: $e')),
       );
@@ -344,43 +439,242 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   }
 
   Future<void> updateTaskStatus(String newStatus) async {
-    final prefs = await SharedPreferences.getInstance();
-    final createdBy = prefs.getInt('accountId');
-
-    if (createdBy == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
-
-    final uri = UriHelper.build('/task/${widget.taskId}/status');
-
-    final payload = {"status": newStatus, "createdBy": createdBy};
-
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final createdBy = prefs.getInt('accountId');
+
+      if (createdBy == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/task/${widget.taskId}/status');
+      final payload = {'status': newStatus, 'createdBy': createdBy};
+
+
       final response = await http.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
         body: jsonEncode(payload),
       );
 
+
       if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          setState(() {
+            task!.status = newStatus;
+            _errorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Update status successfully')),
+          );
+        } else {
+          setState(() {
+            _errorMessage = jsonBody['message'] ?? 'Update failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Update failed: ${jsonBody['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
         setState(() {
-          task!.status = newStatus;
+          _errorMessage = 'Server error: ${response.statusCode}';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Update status successfully')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: ${response.body}')),
+          SnackBar(content: Text('Update failed: ${response.statusCode}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+
+      setState(() {
+        _errorMessage = 'Error updating task status: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating task status: $e')),
+      );
+    }
+  }
+
+  Future<void> createSubtask(BuildContext context, String taskId, String title) async {
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/subtask/create2');
+      final payload = Subtask(taskId: taskId, title: title, createdBy: accountId).toJson();
+
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() {
+          _isCreatingSubtask = false;
+          _subtaskController.clear();
+          _errorMessage = null;
+        });
+        await fetchSubtasks();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subtask created successfully')),
+        );
+      } else {
+        final jsonBody = json.decode(response.body);
+        setState(() {
+          _errorMessage = jsonBody['message'] ?? 'Failed to create subtask';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Create failed: ${jsonBody['message'] ?? 'Unknown error'}')),
+        );
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Error creating subtask: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating subtask: $e')),
+      );
+    }
+  }
+
+  Future<List<TaskAssignment>> fetchTaskAssignments() async {
+    try {
+      if (!await validateCredentials()) {
+        throw Exception('Credentials not found');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/task/${widget.taskId}/taskassignment');
+
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
+
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        if (jsonResponse['isSuccess'] == true) {
+          final List<dynamic> data = jsonResponse['data'];
+          return data.map((e) => TaskAssignment.fromJson(e)).toList();
+        } else {
+          throw Exception(jsonResponse['message'] ?? 'Failed to load task assignments');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+
+      throw Exception('Error fetching task assignments: $e');
+    }
+  }
+
+  Future<void> _updateIssueType(String newType) async {
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/task/${task!.id}/type');
+      final payload = {'type': newType.toUpperCase(), 'createdBy': accountId};
+
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: jsonEncode(payload),
+      );
+
+
+      if (response.statusCode == 200) {
+        final parsed  = json.decode(response.body);
+        if (parsed ['isSuccess'] == true) {
+          setState(() {
+            task!.type = parsed ['data']['type'];
+            _errorMessage = null;
+          });
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Issue type updated successfully')),
+          );
+        } else {
+          setState(() {
+            _errorMessage = parsed ['message'] ?? 'Update failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Update failed: ${parsed ['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Update failed: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Error updating issue type: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating issue type: $e')),
+      );
     }
   }
 
@@ -391,15 +685,15 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            "Select a status",
+            'Select a status',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildStatusOption("TO_DO", Colors.grey, context),
+          _buildStatusOption('TO_DO', Colors.grey, context),
           const Divider(),
-          _buildStatusOption("IN_PROGRESS", Color(0xFF5BA6E3), context),
+          _buildStatusOption('IN_PROGRESS', Color(0xFF5BA6E3), context),
           const Divider(),
-          _buildStatusOption("DONE", Color(0xFF78CC7F), context),
+          _buildStatusOption('DONE', Color(0xFF78CC7F), context),
         ],
       ),
     );
@@ -408,7 +702,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   Widget _buildStatusOption(String status, Color color, BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).pop(); // Đóng bottom sheet
+        Navigator.of(context).pop();
         updateTaskStatus(status);
       },
       child: Container(
@@ -449,37 +743,83 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     }
   }
 
-  Future<void> createSubtask(
-    BuildContext context,
-    String taskId,
-    String title,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getInt('accountId');
+  Widget _buildIssueTypeSheet(BuildContext context) {
+    final types = ['Task', 'Bug', 'Story'];
+    final descriptions = [
+      'Tasks track small, distinct pieces of work.',
+      'Bugs track problems or errors.',
+      'Stories track functionality or features expressed as user goals.',
+    ];
+    final icons = [
+      'assets/type_task.svg',
+      'assets/type_bug.svg',
+      'assets/type_story.svg',
+    ];
 
-    if (accountId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
-
-    final url = UriHelper.build('/subtask/create2');
-
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
-      body: jsonEncode(
-        Subtask(taskId: taskId, title: title, createdBy: accountId).toJson(),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Issue Type',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(types.length, (index) {
+            final selected = task!.type.toLowerCase() == types[index].toLowerCase();
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected ? Colors.blue : Colors.grey.shade300,
+                ),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                leading: SvgPicture.asset(icons[index], width: 24, height: 24),
+                title: Text(
+                  types[index],
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(descriptions[index]),
+                trailing: selected ? const Icon(Icons.check, color: Colors.blue) : null,
+                onTap: () {
+                  if (!selected) {
+                    _updateIssueType(types[index]);
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+            );
+          }),
+        ],
       ),
     );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      print('Created successfully');
-    } else {
-      print('Create failed: ${response.body}');
-      throw Exception('Failed to create subtask');
-    }
   }
 
   final GlobalKey _subtaskKey = GlobalKey();
@@ -537,21 +877,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     );
   }
 
-  Future<List<TaskAssignment>> fetchTaskAssignments() async {
-    final response = await http.get(
-      UriHelper.build('/task/${widget.taskId}/taskassignment'),
-      headers: {'accept': '*/*'},
-    );
-
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      final List<dynamic> data = jsonResponse['data'];
-      return data.map((e) => TaskAssignment.fromJson(e)).toList();
-    } else {
-      throw Exception('Failed to load task assignments');
-    }
-  }
-
   String _getTaskTypeAsset(String type) {
     switch (type.toUpperCase()) {
       case 'BUG':
@@ -565,7 +890,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
   }
 
   Widget buildDetailRow(String title, String value) {
-    if (title == "Issue Type") {
+    if (title == 'Issue Type') {
       String iconPath = getIssueTypeIconPath(value);
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -573,7 +898,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "$title: ",
+              '$title: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 8),
@@ -589,7 +914,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         child: Row(
           children: [
             Text(
-              "$title: ",
+              '$title: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 8),
@@ -613,133 +938,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     }
   }
 
-  Widget _buildIssueTypeSheet(BuildContext context) {
-    final types = ['Task', 'Bug', 'Story'];
-    final descriptions = [
-      'Tasks track small, distinct pieces of work.',
-      'Bugs track problems or errors.',
-      'Stories track functionality or features expressed as user goals.',
-    ];
-    final icons = [
-      'assets/type_task.svg',
-      'assets/type_bug.svg',
-      'assets/type_story.svg',
-    ];
-
-    Future<void> _updateIssueType(String newType) async {
-      final prefs = await SharedPreferences.getInstance();
-      final accountId = prefs.getInt('accountId');
-
-      if (accountId == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-        return;
-      }
-
-      final url = UriHelper.build('/task/${task!.id}/type');
-      final payload = {"type": newType.toUpperCase(), "createdBy": accountId};
-
-      try {
-        final response = await http.patch(
-          url,
-          headers: {'Content-Type': 'application/json', 'Accept': '*/*'},
-          body: jsonEncode(payload),
-        );
-
-        if (response.statusCode == 200) {
-          final json = jsonDecode(response.body);
-          if (json['isSuccess'] == true) {
-            setState(() {
-              task!.type = json['data']['type'];
-            });
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Issue type updated successfully')),
-            );
-          } else {
-            throw Exception(json['message'] ?? 'Update failed');
-          }
-        } else {
-          throw Exception('Server returned ${response.statusCode}');
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update issue type: $e')),
-        );
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Issue Type',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ...List.generate(types.length, (index) {
-            final selected =
-                task!.type.toLowerCase() == types[index].toLowerCase();
-            return Container(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: selected ? Colors.blue : Colors.grey.shade300,
-                ),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                leading: SvgPicture.asset(icons[index], width: 24, height: 24),
-                title: Text(
-                  types[index],
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: Text(descriptions[index]),
-                trailing:
-                    selected
-                        ? const Icon(Icons.check, color: Colors.blue)
-                        : null,
-                onTap: () {
-                  if (!selected) {
-                    _updateIssueType(types[index]);
-                  } else {
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -747,7 +945,28 @@ class _TaskDetailPage extends State<TaskDetailPage> {
     }
 
     if (task == null) {
-      return const Scaffold(body: Center(child: Text('Task not found')));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Task not found${_errorMessage != null ? ': $_errorMessage' : ''}',
+                  style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isLoading = true;
+                    _errorMessage = null;
+                  });
+                  fetchTaskDetail();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -781,20 +1000,19 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                   _isCreatingSubtask = true;
                 });
               } else if (value == 'attachment') {
-                // Xử lý tạo attachment tại đây
+                _uploadFile();
               }
             },
-            itemBuilder:
-                (BuildContext context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
-                    value: 'subtask',
-                    child: Text('Create subtask'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'attachment',
-                    child: Text('Create attachment'),
-                  ),
-                ],
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'subtask',
+                child: Text('Create subtask'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'attachment',
+                child: Text('Create attachment'),
+              ),
+            ],
             icon: const Icon(Icons.more_vert),
           ),
         ],
@@ -804,61 +1022,54 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title task
                 Expanded(
                   child: Text(
-                    task!.title ?? "No title",
+                    task!.title ?? 'No title',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
                 Row(
-                  children:
-                      (taskAssignments ?? []).map((assignment) {
-                        final hasImage =
-                            assignment.accountPicture != null &&
-                            assignment.accountPicture!.isNotEmpty;
-                        final firstLetter =
-                            assignment.accountFullname
-                                ?.split(' ')
-                                .last
-                                .characters
-                                .first ??
-                            'U';
+                  children: (taskAssignments).map((assignment) {
+                    final hasImage =
+                        assignment.accountPicture != null && assignment.accountPicture!.isNotEmpty;
+                    final firstLetter =
+                        assignment.accountFullname?.split(' ').last.characters.first ?? 'U';
 
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 4.0),
-                          child: CircleAvatar(
-                            radius: 15,
-                            backgroundImage:
-                                hasImage
-                                    ? NetworkImage(assignment.accountPicture!)
-                                    : null,
-                            backgroundColor: Colors.blue[100],
-                            child:
-                                !hasImage
-                                    ? Text(
-                                      firstLetter,
-                                      style: const TextStyle(
-                                        color: Colors.black,
-                                      ),
-                                    )
-                                    : null,
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 4.0),
+                      child: CircleAvatar(
+                        radius: 15,
+                        backgroundImage: hasImage ? NetworkImage(assignment.accountPicture!) : null,
+                        backgroundColor: Colors.blue[100],
+                        child: !hasImage
+                            ? Text(
+                          firstLetter,
+                          style: const TextStyle(
+                            color: Colors.black,
                           ),
-                        );
-                      }).toList(),
+                        )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
-
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () {
@@ -889,19 +1100,16 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
             buildCard(
-              title: "Description",
+              title: 'Description',
               child: Text(
-                task!.description ?? "Add a description...",
+                task!.description ?? 'Add a description...',
                 style: const TextStyle(color: Colors.black),
               ),
             ),
-
             buildCard(
-              title: "Attachments",
+              title: 'Attachments',
               badgeCount: _taskFiles.length,
               onTap: () async {
                 setState(() {
@@ -964,17 +1172,16 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: _uploadFile, // Updated to call _uploadFile
+                    onPressed: _uploadFile,
                     icon: const Icon(Icons.add),
-                    label: const Text("Add attachment"),
+                    label: const Text('Add attachment'),
                   ),
                 ],
               )
                   : const SizedBox.shrink(),
             ),
-
             buildCard(
-              title: "Parent Work Item",
+              title: 'Parent Work Item',
               onTap: () {},
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -1021,7 +1228,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ),
               ),
             ),
-
             SingleChildScrollView(
               controller: _scrollController,
               child: Column(
@@ -1029,7 +1235,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                   Container(
                     key: _subtaskKey,
                     child: buildCard(
-                      title: "Subtask List",
+                      title: 'Subtask List',
                       badgeCount: subtasks.length,
                       onTap: () {
                         setState(() {
@@ -1044,14 +1250,8 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                               final total = subtasks.length;
                               if (total == 0) return const SizedBox();
 
-                              final done =
-                                  subtasks
-                                      .where((s) => s.status == 'DONE')
-                                      .length;
-                              final inProgress =
-                                  subtasks
-                                      .where((s) => s.status == 'IN_PROGRESS')
-                                      .length;
+                              final done = subtasks.where((s) => s.status == 'DONE').length;
+                              final inProgress = subtasks.where((s) => s.status == 'IN_PROGRESS').length;
                               final toDo = total - done - inProgress;
 
                               return Column(
@@ -1063,9 +1263,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                                         height: 8,
                                         decoration: BoxDecoration(
                                           color: Colors.grey[300],
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
                                       ),
                                       Row(
@@ -1076,7 +1274,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                                               height: 8,
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFF78CC7F),
-                                                //borderRadius: const BorderRadius.horizontal(left: Radius.circular(4)),
                                               ),
                                             ),
                                           ),
@@ -1093,7 +1290,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                                               height: 8,
                                               decoration: BoxDecoration(
                                                 color: Colors.grey,
-                                                //borderRadius: const BorderRadius.horizontal(right: Radius.circular(4), left: Radius.circular(4)),
                                               ),
                                             ),
                                           ),
@@ -1103,132 +1299,111 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "Progress: $done/$total done",
+                                    'Progress: $done/$total done',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.black54,
                                     ),
                                   ),
-
                                   const SizedBox(height: 8),
                                 ],
                               );
                             },
                           ),
-
-                          // Subtask List (expandable)
                           _isSubtaskExpanded
                               ? Column(
-                                children: [
-                                  ...subtasks.map(
+                            children: [
+                              ...subtasks.map(
                                     (subtask) => ListTile(
-                                      dense: true,
-                                      visualDensity: VisualDensity.compact,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                          ),
-                                      leading: SvgPicture.asset(
-                                        'assets/type_subtask.svg',
-                                        width: 18,
-                                        height: 18,
-                                      ),
-                                      title: Text(
-                                        subtask.title ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
+                                  dense: true,
+                                  visualDensity: VisualDensity.compact,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  leading: SvgPicture.asset(
+                                    'assets/type_subtask.svg',
+                                    width: 18,
+                                    height: 18,
+                                  ),
+                                  title: Text(
+                                    subtask.title ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    subtask.id ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  trailing: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(subtask.status ?? ''),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      subtask.status ?? '',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => SubtaskDetailPage(
+                                          subtaskId: subtask.id ?? '',
                                         ),
                                       ),
-                                      subtitle: Text(
-                                        subtask.id ?? '',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey,
-                                        ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _isCreatingSubtask
+                                  ? Row(
+                                children: [
+                                  SvgPicture.asset(
+                                    'assets/type_subtask.svg',
+                                    width: 18,
+                                    height: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _subtaskController,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Add a subtask',
+                                        border: InputBorder.none,
                                       ),
-                                      trailing: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(
-                                            subtask.status ?? '',
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          subtask.status ?? '',
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ),
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (_) => SubtaskDetailPage(
-                                                  subtaskId: subtask.id ?? '',
-                                                ),
-                                          ),
-                                        );
+                                      onSubmitted: (value) async {
+                                        try {
+                                          await createSubtask(context, widget.taskId, value);
+                                        } catch (e) {
+
+                                        }
                                       },
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-
-                                  _isCreatingSubtask
-                                      ? Row(
-                                        children: [
-                                          SvgPicture.asset(
-                                            'assets/type_subtask.svg',
-                                            width: 18,
-                                            height: 18,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: TextField(
-                                              controller: _subtaskController,
-                                              decoration: const InputDecoration(
-                                                hintText: 'Add a subtask',
-                                                border: InputBorder.none,
-                                              ),
-                                              onSubmitted: (value) async {
-                                                try {
-                                                  await createSubtask(
-                                                    context,
-                                                    widget.taskId,
-                                                    value,
-                                                  );
-                                                  setState(() {
-                                                    _isCreatingSubtask = false;
-                                                    _subtaskController.clear();
-                                                    fetchSubtasks(); // nếu có function load lại subtasks
-                                                  });
-                                                } catch (e) {
-                                                  print(
-                                                    'Error create subtask: $e',
-                                                  );
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                      : OutlinedButton.icon(
-                                        onPressed: () {
-                                          setState(() {
-                                            _isCreatingSubtask = true;
-                                          });
-                                        },
-                                        icon: const Icon(Icons.add),
-                                        label: const Text("Create subtask"),
-                                      ),
                                 ],
                               )
+                                  : OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _isCreatingSubtask = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Create subtask'),
+                              ),
+                            ],
+                          )
                               : const SizedBox.shrink(),
                         ],
                       ),
@@ -1237,60 +1412,47 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 ],
               ),
             ),
-
             buildCard(
-              title: "Assignee",
+              title: 'Assignee',
               child: Column(
-                children:
-                    taskAssignments.map((assignment) {
-                      return ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 2,
-                          horizontal: 0,
+                children: taskAssignments.map((assignment) {
+                  return ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 2,
+                      horizontal: 0,
+                    ),
+                    visualDensity: const VisualDensity(
+                      horizontal: 0,
+                      vertical: -4,
+                    ),
+                    leading: CircleAvatar(
+                      radius: 13,
+                      backgroundImage: assignment.accountPicture != null &&
+                          assignment.accountPicture!.isNotEmpty
+                          ? NetworkImage(assignment.accountPicture!)
+                          : null,
+                      backgroundColor: Colors.blue[100],
+                      child: (assignment.accountPicture == null || assignment.accountPicture!.isEmpty)
+                          ? Text(
+                        (assignment.accountFullname?.split(' ').last.characters.first ?? 'U'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black,
                         ),
-                        visualDensity: const VisualDensity(
-                          horizontal: 0,
-                          vertical: -4,
-                        ),
-
-                        leading: CircleAvatar(
-                          radius: 13,
-                          backgroundImage:
-                              assignment.accountPicture != null &&
-                                      assignment.accountPicture!.isNotEmpty
-                                  ? NetworkImage(assignment.accountPicture!)
-                                  : null,
-                          backgroundColor: Colors.blue[100],
-                          child:
-                              (assignment.accountPicture == null ||
-                                      assignment.accountPicture!.isEmpty)
-                                  ? Text(
-                                    (assignment.accountFullname
-                                            ?.split(' ')
-                                            .last
-                                            .characters
-                                            .first ??
-                                        'U'),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black,
-                                    ),
-                                  )
-                                  : null,
-                        ),
-                        title: Text(
-                          assignment.accountFullname ?? 'Unassigned',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      );
-                    }).toList(),
+                      )
+                          : null,
+                    ),
+                    title: Text(
+                      assignment.accountFullname ?? 'Unassigned',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
-
-            // Details
             buildCard(
-              title: "Details",
+              title: 'Details',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1304,33 +1466,25 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                             top: Radius.circular(16),
                           ),
                         ),
-                        builder:
-                            (bottomSheetContext) =>
-                                _buildIssueTypeSheet(bottomSheetContext),
+                        builder: (bottomSheetContext) => _buildIssueTypeSheet(bottomSheetContext),
                       );
                     },
-                    child: buildDetailRow("Issue Type", task!.type),
+                    child: buildDetailRow('Issue Type', task!.type),
                   ),
                   buildDetailRow(
-                    "Start Date",
-                    task?.plannedStartDate
-                            ?.toIso8601String()
-                            .split("T")
-                            .first ??
-                        'None',
+                    'Start Date',
+                    task?.plannedStartDate?.toIso8601String().split('T').first ?? 'None',
                   ),
                   buildDetailRow(
-                    "End Date",
-                    task?.plannedEndDate?.toIso8601String().split("T").first ??
-                        'None',
+                    'End Date',
+                    task?.plannedEndDate?.toIso8601String().split('T').first ?? 'None',
                   ),
-                  buildDetailRow("Sprint", task?.sprintName ?? 'None'),
+                  buildDetailRow('Sprint', task?.sprintName ?? 'None'),
                 ],
               ),
             ),
-
             buildCard(
-              title: "Reporter",
+              title: 'Reporter',
               child: ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -1341,27 +1495,19 @@ class _TaskDetailPage extends State<TaskDetailPage> {
                 leading: CircleAvatar(
                   radius: 13,
                   backgroundImage:
-                      task!.reporterPicture != null &&
-                              task!.reporterPicture!.isNotEmpty
-                          ? NetworkImage(task!.reporterPicture!)
-                          : null,
+                  task!.reporterPicture != null && task!.reporterPicture!.isNotEmpty
+                      ? NetworkImage(task!.reporterPicture!)
+                      : null,
                   backgroundColor: Colors.blue[100],
-                  child:
-                      (task!.reporterPicture == null ||
-                              task!.reporterPicture!.isEmpty)
-                          ? Text(
-                            (task!.reporterName
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          )
-                          : null,
+                  child: (task!.reporterPicture == null || task!.reporterPicture!.isEmpty)
+                      ? Text(
+                    (task!.reporterName?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  )
+                      : null,
                 ),
                 title: Text(
                   task!.reporterName ?? 'Unassigned',
@@ -1375,16 +1521,4 @@ class _TaskDetailPage extends State<TaskDetailPage> {
       ),
     );
   }
-
-  // Widget buildDetailRow(String label, String value) {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(vertical: 4),
-  //     child: Row(
-  //       children: [
-  //         Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
-  //         Expanded(child: Text(value)),
-  //       ],
-  //     ),
-  //   );
-  // }
 }

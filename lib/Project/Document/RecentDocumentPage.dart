@@ -172,7 +172,7 @@ class _RecentDocumentPageState extends State<RecentDocumentPage> {
                     builder: (_) => DocumentEditorPage(
                       documentId: detail['id'],
                       title: detail['title'] ?? 'Untitled',
-                      content: detail['content'] ?? '', visibility: '',
+                      content: detail['content'] ?? '',
                     ),
                   ),
                 );

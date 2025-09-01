@@ -201,9 +201,19 @@ class _RiskPageState extends State<RiskPage> {
 
   Future<void> fetchScopeTypes() async {
     final uri = UriHelper.build('/dynamiccategory/by-category-group?categoryGroup=risk_scope');
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken') ?? '';
     print('Fetching scope types from: $uri');
     try {
-      final response = await http.get(uri);
+      final response = await http.get(
+        uri,
+        headers: {
+        "Content-Type": "application/json",
+        'Authorization': 'Bearer $token',
+        'Accept': '*/*',
+        },
+      );
       print('Scope types response status: ${response.statusCode}');
       print('Scope types response body: ${response.body}');
 

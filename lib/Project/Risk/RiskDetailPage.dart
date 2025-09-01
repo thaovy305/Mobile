@@ -221,7 +221,16 @@ class _RiskDetailPageState extends State<RiskDetailPage> {
 
   Future<List<DynamicCategory>> fetchCategories(String categoryGroup) async {
     final url = UriHelper.build('/dynamiccategory/by-category-group?categoryGroup=$categoryGroup');
-    final response = await http.get(url);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken') ?? '';
+    final response = await http.get(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': 'Bearer $token',
+        'Accept': '*/*',
+      },
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final List<dynamic> categories = data['data'];

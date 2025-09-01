@@ -366,21 +366,46 @@ class TimeComparisonChart extends StatelessWidget {
                       },
                     ),
                   ),
+                  // bottomTitles: AxisTitles(
+                  //   sideTitles: SideTitles(
+                  //     showTitles: true,
+                  //     reservedSize: 60, // Increased to accommodate multi-word labels
+                  //     getTitlesWidget: (value, meta) {
+                  //       final index = value.toInt();
+                  //       if (index >= 0 && index < chartData.length) {
+                  //         return Padding(
+                  //           padding: const EdgeInsets.only(top: 8),
+                  //           child: Text(
+                  //             chartData[index]['name'] as String,
+                  //             style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  //             textAlign: TextAlign.center,
+                  //             maxLines: 2,
+                  //             overflow: TextOverflow.ellipsis,
+                  //           ),
+                  //         );
+                  //       }
+                  //       return const SizedBox.shrink();
+                  //     },
+                  //   ),
+                  // ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 60, // Increased to accommodate multi-word labels
+                      reservedSize: 70, // Giữ không gian đủ lớn
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
                         if (index >= 0 && index < chartData.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              chartData[index]['name'] as String,
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                          return Transform.rotate(
+                            angle: -10 * 3.14159 / 180, // Xoay 45 độ (radian)
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 10.0),
+                              child: Text(
+                                chartData[index]['name'] as String,
+                                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           );
                         }

@@ -45,13 +45,15 @@ class _LoginPageState extends State<LoginPage> {
         final username = data['data']['username'];
         final accountId = data['data']['id'];
         final email = data['data']['email'];
-
+        final role = data['data']['role'];
         final prefs = await SharedPreferences.getInstance();
 
         await prefs.setString('username', username);
         await prefs.setString('accessToken', token);
         await prefs.setInt('accountId', accountId);
         await prefs.setString('email', email);
+        await prefs.setString('userRole', role);
+
 
         Navigator.pushReplacement(
           context,

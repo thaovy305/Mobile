@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'DocumentEditorPage.dart';
-
+import '../../Helper/UriHelper.dart';
 // LIST WIDGET (reusable & easier to manage)
 class DocumentListView extends StatelessWidget {
   final List<dynamic> documents;
@@ -24,7 +24,7 @@ class DocumentListView extends StatelessWidget {
   Future<Map<String, dynamic>?> fetchDocumentDetail(int docId, BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken') ?? '';
-    final url = Uri.parse('https://10.0.2.2:7128/api/documents/$docId');
+    final url = UriHelper.build('/documents/$docId');
     try {
       final res = await http.get(url, headers: {
         'accept': '*/*',
@@ -67,7 +67,7 @@ class DocumentListView extends StatelessWidget {
   Future<bool> _deleteDocument(int docId, BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken') ?? '';
-    final url = Uri.parse('https://10.0.2.2:7128/api/documents/$docId');
+    final url = UriHelper.build('/documents/$docId');
 
     try {
       final res = await http.delete(url, headers: {
@@ -290,6 +290,7 @@ class DocumentListView extends StatelessWidget {
                             documentId: detail['id'],
                             title: detail['title'] ?? 'Untitled',
                             content: detail['content'] ?? '',
+                            visibility: detail['visibility'] ?? tabType,
                           ),
                         ),
                       ).then((_) {
@@ -453,7 +454,7 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken') ?? '';
-    final url = Uri.parse('https://10.0.2.2:7128/api/documents/project/$_projectId');
+    final url = UriHelper.build('/documents/project/$_projectId');
 
     try {
       final res = await http.get(url, headers: {
@@ -644,9 +645,18 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
   }
 
   Future<int?> _getProjectIdFromKey(String projectKey) async {
-    final url = Uri.parse('https://10.0.2.2:7128/api/project/by-project-key?projectKey=$projectKey');
+    final url = UriHelper.build('/project/by-project-key?projectKey=$projectKey');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken') ?? '';
     try {
-      final res = await http.get(url, headers: {'accept': '*/*'});
+      final res = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
       if (res.statusCode == 200) return jsonDecode(res.body)['data']['id'];
     } catch (e) {
       print('Connection error: $e');
@@ -671,7 +681,7 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken') ?? '';
-    final url = Uri.parse('https://10.0.2.2:7128/api/documents/create');
+    final url = UriHelper.build('/documents/create');
     final bodyData = {
       "projectId": _projectId,
       "title": title,
@@ -698,6 +708,7 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
                 documentId: documentId,
                 title: title,
                 content: "",
+                visibility: type,
               ),
             ),
           ).then((_) => _fetchAndFilterDocuments(showLoading: false));

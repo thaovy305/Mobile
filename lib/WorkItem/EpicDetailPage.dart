@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../Helper/UriHelper.dart';
 import '../Models/EpicFile.dart';
 import '../Models/Task.dart';
-import '../models/epic.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:image_picker/image_picker.dart';
+import '../Models/Epic.dart';
 import 'EpicCommentSection.dart';
 import 'TaskDetailPage.dart';
 
@@ -30,6 +30,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   bool _isLoadingAttachments = false;
   List<Task> _tasks = [];
   bool _isTaskExpanded = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -39,29 +40,62 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
     loadTasks();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        _errorMessage = 'Credentials not found in preferences';
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credentials not found in preferences')),
+      );
+      return false;
+    }
+    return true;
+  }
+
   void loadTasks() async {
     try {
-      final fetched = await fetchTasksByEpicId('${widget.epicId}');
+      final fetched = await fetchTasksByEpicId(widget.epicId);
       setState(() {
         _tasks = fetched;
+        _errorMessage = null;
       });
     } catch (e) {
-      print("Error loading tasks: $e");
+
+      setState(() {
+        _errorMessage = 'Error loading tasks: $e';
+      });
     }
   }
 
   Future<void> fetchEpicDetail() async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/epic/${widget.epicId}');
-      final response = await http.get(uri);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
-
         if (jsonBody['isSuccess'] == true) {
           setState(() {
             epicData = Epic.fromJson(jsonBody['data']);
             isLoading = false;
+            _errorMessage = null;
           });
         } else {
           showError(jsonBody['message'] ?? 'Epic not found');
@@ -77,50 +111,434 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
   void showError(String message) {
     setState(() {
       isLoading = false;
+      _errorMessage = message;
     });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> updateEpicStatus(String newStatus) async {
-    final prefs = await SharedPreferences.getInstance();
-    final createdBy = prefs.getInt('accountId');
-
-    if (createdBy == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
-
-    final uri = UriHelper.build('/epic/${widget.epicId}/status');
-
-    final payload = {"status": newStatus, "createdBy": createdBy};
-
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final createdBy = prefs.getInt('accountId');
+
+      if (createdBy == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/epic/${widget.epicId}/status');
+      final payload = {'status': newStatus, 'createdBy': createdBy};
+
+
       final response = await http.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
         body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          setState(() {
+            epicData!.status = newStatus;
+            _errorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Status updated successfully')),
+          );
+        } else {
+          setState(() {
+            _errorMessage = jsonBody['message'] ?? 'Update failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Update failed: ${jsonBody['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
         setState(() {
-          epicData!.status = newStatus;
+          _errorMessage = 'Server error: ${response.statusCode}';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Status updated successfully')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update status: ${response.body}')),
+          SnackBar(content: Text('Update failed: ${response.statusCode}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+
+      setState(() {
+        _errorMessage = 'Error updating epic status: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating epic status: $e')),
+      );
+    }
+  }
+
+  Future<void> _fetchEpicFiles() async {
+    setState(() {
+      _isLoadingAttachments = true;
+      _errorMessage = null;
+    });
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/epicfile/by-epic/${widget.epicId}');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        if (jsonData['isSuccess']) {
+          final List<EpicFile> files =
+          (jsonData['data'] as List).map((e) => EpicFile.fromJson(e)).toList();
+          setState(() {
+            _epicFiles = files;
+            _errorMessage = null;
+          });
+        } else {
+          setState(() {
+            _errorMessage = jsonData['message'] ?? 'Failed to load epic files';
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingAttachments = false;
+      });
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    setState(() {
+      _isLoadingAttachments = true;
+      _errorMessage = null;
+    });
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final source = await showModalBottomSheet<ImageSource?>(
+        context: context,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Choose a File'),
+              onTap: () => Navigator.pop(context, null),
+            ),
+          ],
+        ),
+      );
+
+      PlatformFile? file;
+      String? fileName;
+
+      if (source != null) {
+        final ImagePicker _picker = ImagePicker();
+        final XFile? photo = await _picker.pickImage(source: source);
+        if (photo == null) {
+
+          setState(() {
+            _errorMessage = 'No photo selected';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No photo selected')),
+          );
+          return;
+        }
+        file = PlatformFile(
+          name: photo.name,
+          path: photo.path,
+          size: await photo.length(),
+        );
+        fileName = photo.name;
+      } else {
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+          withData: true,
+        );
+        if (result == null || result.files.isEmpty) {
+
+          setState(() {
+            _errorMessage = 'No file selected';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No file selected')),
+          );
+          return;
+        }
+        file = result.files.first;
+        fileName = file.name;
+      }
+
+      if (file.path == null && file.bytes == null) {
+
+        setState(() {
+          _errorMessage = 'Selected file has no valid path or data';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Selected file has no valid path or data')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/epicfile/upload');
+
+      var request = http.MultipartRequest('POST', uri);
+
+      request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = '*/*';
+
+      request.fields['epicId'] = widget.epicId;
+      request.fields['title'] = fileName;
+      request.fields['createdBy'] = accountId.toString();
+
+      if (file.path != null) {
+
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'urlFile',
+            file.path!,
+            filename: fileName,
+          ),
+        );
+      } else if (file.bytes != null) {
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'urlFile',
+            file.bytes!,
+            filename: fileName,
+          ),
+        );
+      }
+
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonResponse = json.decode(responseBody);
+        if (jsonResponse['isSuccess'] == true ||
+            (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File uploaded successfully')),
+          );
+          await _fetchEpicFiles();
+        } else {
+          setState(() {
+            _errorMessage = jsonResponse['message'] ?? 'Upload failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Upload failed: ${response.reasonPhrase}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
+        );
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Error uploading file: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error uploading file: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoadingAttachments = false;
+      });
+    }
+  }
+
+  Future<List<Task>> fetchTasksByEpicId(String epicId) async {
+    try {
+      if (!await validateCredentials()) {
+        throw Exception('Credentials not found');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/task/by-epic-id?epicId=${widget.epicId}');
+
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['isSuccess'] == true) {
+          final List<dynamic> data = jsonResponse['data'];
+          return data.map((e) => Task.fromJson(e)).toList();
+        } else {
+          throw Exception(jsonResponse['message'] ?? 'Failed to load tasks');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+
+      throw Exception('Error fetching tasks: $e');
+    }
+  }
+
+  Future<void> _createTask(String title, String type, BuildContext context) async {
+    try {
+      if (title.trim().isEmpty) {
+        setState(() {
+          _errorMessage = 'Title cannot be empty';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Title cannot be empty')),
+        );
+        return;
+      }
+
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+      final projectId = epicData?.projectId;
+      final epicId = epicData?.id;
+      final sprintId = epicData?.sprintId;
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final payload = {
+        'reporterId': accountId,
+        'projectId': projectId,
+        'epicId': epicId,
+        'sprintId': sprintId,
+        'type': type.toUpperCase(),
+        'title': title,
+        'createdBy': accountId,
+        'dependencies': [],
+      };
+
+
+      final response = await http.post(
+        UriHelper.build('/task'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 201) {
+        final parsed  = json.decode(response.body);
+        if (parsed ['isSuccess']) {
+          final newTask = Task.fromJson(parsed ['data']);
+          setState(() {
+            _tasks.insert(0, newTask);
+            _errorMessage = null;
+          });
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Task created successfully')),
+          );
+        } else {
+          setState(() {
+            _errorMessage = parsed ['message'] ?? 'Task creation failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Task creation failed: ${parsed ['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Task creation failed: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Error creating task: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating task: $e')),
+      );
     }
   }
 
@@ -131,15 +549,15 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            "Select a status",
+            'Select a status',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildStatusOption("TO_DO", Colors.grey, context),
+          _buildStatusOption('TO_DO', Colors.grey, context),
           const Divider(),
-          _buildStatusOption("IN_PROGRESS", Color(0xFF5BA6E3), context),
+          _buildStatusOption('IN_PROGRESS', Color(0xFF5BA6E3), context),
           const Divider(),
-          _buildStatusOption("DONE", Color(0xFF78CC7F), context),
+          _buildStatusOption('DONE', Color(0xFF78CC7F), context),
         ],
       ),
     );
@@ -188,222 +606,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
     }
   }
 
-  Future<void> _fetchEpicFiles() async {
-    setState(() {
-      _isLoadingAttachments = true;
-    });
-    try {
-      final response = await http.get(
-        UriHelper.build('/epicfile/by-epic/${widget.epicId}'),
-      );
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        if (jsonData['isSuccess']) {
-          final List<EpicFile> files =
-              (jsonData['data'] as List)
-                  .map((e) => EpicFile.fromJson(e))
-                  .toList();
-          setState(() {
-            _epicFiles = files;
-          });
-        }
-      }
-    } catch (e) {
-      print("Failed to load attachments: $e");
-    } finally {
-      setState(() {
-        _isLoadingAttachments = false;
-      });
-    }
-  }
-
-  Future<void> _uploadFile() async {
-    // Show dialog to choose between camera and file picker
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.camera_alt),
-            title: const Text('Take a Photo'),
-            onTap: () => Navigator.pop(context, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.pop(context, ImageSource.gallery),
-          ),
-          ListTile(
-            leading: const Icon(Icons.attach_file),
-            title: const Text('Choose a File'),
-            onTap: () => Navigator.pop(context, null), // Use file picker
-          ),
-        ],
-      ),
-    );
-
-    try {
-      PlatformFile? file;
-      String? fileName;
-
-      if (source != null) {
-        // Use image_picker for camera or gallery
-        final ImagePicker _picker = ImagePicker();
-        final XFile? photo = await _picker.pickImage(source: source);
-        if (photo == null) {
-          print('No photo selected');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No photo selected')),
-          );
-          return;
-        }
-        file = PlatformFile(
-          name: photo.name,
-          path: photo.path,
-          size: await photo.length(),
-        );
-        fileName = photo.name;
-      } else {
-        // Use file_picker for other files
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          type: FileType.any,
-          allowMultiple: false,
-          withData: true,
-        );
-        if (result == null || result.files.isEmpty) {
-          print('No file selected');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No file selected')),
-          );
-          return;
-        }
-        file = result.files.first;
-        fileName = file.name;
-      }
-
-      if (file.path == null && file.bytes == null) {
-        print('Error: Both file.path and file.bytes are null');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: Selected file has no valid path or data')),
-        );
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final accountId = prefs.getInt('accountId');
-      print('Account ID: $accountId');
-
-      if (accountId == null) {
-        print('Error: accountId not found in SharedPreferences');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AccountId not found')),
-        );
-        return;
-      }
-
-      final uri = UriHelper.build('/epicfile/upload');
-      print('API URL: $uri');
-      var request = http.MultipartRequest('POST', uri);
-
-      request.headers['accept'] = '*/*';
-      request.headers['Content-Type'] = 'multipart/form-data';
-
-      final token = prefs.getString('accessToken');
-      if (token != null) {
-        print('Adding Bearer token to headers');
-        request.headers['Authorization'] = 'Bearer $token';
-      } else {
-        print('Warning: No access token found in SharedPreferences');
-      }
-
-      // Add form fields
-      request.fields['epicId'] = widget.epicId;
-      request.fields['title'] = fileName;
-      request.fields['createdBy'] = accountId.toString();
-      print('Form fields: ${request.fields}');
-
-      // Add the file
-      if (file.path != null) {
-        print('Using file.path to upload');
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'urlFile',
-            file.path!,
-            filename: fileName,
-          ),
-        );
-      } else if (file.bytes != null) {
-        print('Using file.bytes to upload');
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'urlFile',
-            file.bytes!,
-            filename: fileName,
-          ),
-        );
-      }
-
-      // Send the request
-      setState(() {
-        _isLoadingAttachments = true;
-      });
-      print('Sending multipart request...');
-
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
-      print('Response status: ${response.statusCode}');
-      print('Response body: $responseBody');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final jsonResponse = jsonDecode(responseBody);
-        print('Parsed JSON response: $jsonResponse');
-
-        if (jsonResponse['isSuccess'] == true ||
-            (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File uploaded successfully')),
-          );
-          await _fetchEpicFiles();
-        } else {
-          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
-          );
-        }
-      } else {
-        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
-        );
-      }
-    } catch (e) {
-      print('Error uploading file: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading file: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoadingAttachments = false;
-      });
-    }
-  }
-
-  Future<List<Task>> fetchTasksByEpicId(String epicId) async {
-    final response = await http.get(
-      UriHelper.build('/task/by-epic-id?epicId=${widget.epicId}'),
-      headers: {'accept': '*/*'},
-    );
-
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-      final List<dynamic> data = jsonResponse['data'];
-      return data.map((e) => Task.fromJson(e)).toList();
-    } else {
-      throw Exception('Failed to load tasks');
-    }
-  }
-
   Widget buildCard({
     required String title,
     required Widget child,
@@ -414,7 +616,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
       color: Colors.white,
       elevation: 0,
       child: InkWell(
-        // 👈 Bắt sự kiện nhấn
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -461,7 +662,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
       case 'story':
         return 'assets/type_story.svg';
       default:
-        return 'assets/type_task.svg'; // fallback
+        return 'assets/type_task.svg';
     }
   }
 
@@ -507,16 +708,13 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               const SizedBox(height: 16),
               const Text('Create Task', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-
               TextField(
                 decoration: const InputDecoration(labelText: 'Title'),
                 onChanged: (val) => title = val,
               ),
               const SizedBox(height: 16),
-
               const Text('Issue Type', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-
               ...List.generate(types.length, (index) {
                 final type = types[index];
                 final selected = selectedType == type;
@@ -540,7 +738,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                   ),
                 );
               }),
-
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -557,68 +754,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
     );
   }
 
-  Future<void> _createTask(
-    String title,
-    String type,
-    BuildContext context,
-  ) async {
-    if (title.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Title cannot be empty")));
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getInt('accountId');
-    final projectId = epicData?.projectId;
-    final epicId = epicData?.id;
-    final sprintId = epicData?.sprintId;
-    final now = DateTime.now().toIso8601String();
-    print('accountId: $accountId, projectId: $projectId, epicId: $epicId, sprintId: $sprintId');
-
-    final payload = {
-      "reporterId": accountId,
-      "projectId": projectId,
-      "epicId": epicId,
-      "sprintId": sprintId,
-      "type": type.toUpperCase(),
-      "title": title,
-      "createdBy": accountId,
-      "dependencies": [],
-    };
-
-    try {
-      final response = await http.post(
-        UriHelper.build('/task'),
-        headers: {'Content-Type': 'application/json', 'Accept': '*/*'},
-        body: jsonEncode(payload),
-      );
-
-      if (response.statusCode == 201) {
-        final json = jsonDecode(response.body);
-        if (json['isSuccess']) {
-          final newTask = Task.fromJson(json['data']);
-          setState(() {
-            _tasks.insert(0, newTask);
-          });
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Task created successfully")),
-          );
-        } else {
-          throw Exception(json['message']);
-        }
-      } else {
-        throw Exception('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to create task: $e")));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -626,7 +761,30 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
     }
 
     if (epicData == null) {
-      return const Scaffold(body: Center(child: Text('Epic not found')));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Epic not found${_errorMessage != null ? ': $_errorMessage' : ''}',
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isLoading = true;
+                    _errorMessage = null;
+                  });
+                  fetchEpicDetail();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -643,7 +801,10 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () => _showCreateTaskSheet(context),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -651,6 +812,14 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
             Text(
               epicData!.name,
               style: const TextStyle(
@@ -661,7 +830,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               softWrap: true,
               overflow: TextOverflow.visible,
             ),
-            const SizedBox(height: 8), // khoảng cách giữa name và dropdown
+            const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () {
                 showModalBottomSheet(
@@ -695,19 +864,14 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-            // Description Card
             buildCard(
-              title: "Description",
+              title: 'Description',
               child: Text(
-                epicData!.description.isNotEmpty
-                    ? epicData!.description
-                    : "Add a description...",
+                epicData!.description.isNotEmpty ? epicData!.description : 'Add a description...',
               ),
             ),
-
-            // Attachments
             buildCard(
-              title: "Attachments",
+              title: 'Attachments',
               badgeCount: _epicFiles.length,
               onTap: () async {
                 setState(() {
@@ -717,75 +881,68 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                   await _fetchEpicFiles();
                 }
               },
-              child:
-                  _isAttachmentsExpanded
-                      ? _isLoadingAttachments
-                          ? const Center(child: CircularProgressIndicator())
-                          : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              child: _isAttachmentsExpanded
+                  ? _isLoadingAttachments
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ..._epicFiles.map(
+                        (file) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          launchUrl(Uri.parse(file.urlFile));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              ..._epicFiles.map(
-                                (file) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                  ),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      launchUrl(Uri.parse(file.urlFile));
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.insert_drive_file,
-                                            color: Colors.blue,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  file.title,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
+                              const Icon(
+                                Icons.insert_drive_file,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      file.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 4),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                onPressed: _uploadFile,
-                                icon: const Icon(Icons.add),
-                                label: const Text("Add attachment"),
-                              ),
                             ],
-                          )
-                      : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _uploadFile,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add attachment'),
+                  ),
+                ],
+              )
+                  : const SizedBox.shrink(),
             ),
-
-            // Parent
-            buildCard(title: "Parent work item", child: const Text("None")),
-
+            buildCard(title: 'Parent work item', child: const Text('None')),
             buildCard(
-              title: "Task Item",
+              title: 'Task Item',
               badgeCount: _tasks.length,
               onTap: () {
                 setState(() {
@@ -795,16 +952,13 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Progress bar
                   Builder(
                     builder: (_) {
                       final total = _tasks.length;
                       if (total == 0) return const SizedBox();
 
-                      final done =
-                          _tasks.where((s) => s.status == 'DONE').length;
-                      final inProgress =
-                          _tasks.where((s) => s.status == 'IN_PROGRESS').length;
+                      final done = _tasks.where((s) => s.status == 'DONE').length;
+                      final inProgress = _tasks.where((s) => s.status == 'IN_PROGRESS').length;
                       final toDo = total - done - inProgress;
 
                       return Column(
@@ -827,7 +981,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                       height: 8,
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF78CC7F),
-                                        //borderRadius: const BorderRadius.horizontal(left: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
@@ -844,7 +997,6 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                                       height: 8,
                                       decoration: BoxDecoration(
                                         color: Colors.grey,
-                                        //borderRadius: const BorderRadius.horizontal(right: Radius.circular(4)),
                                       ),
                                     ),
                                   ),
@@ -854,7 +1006,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Progress: $done/$total done",
+                            'Progress: $done/$total done',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.black54,
@@ -865,76 +1017,71 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                       );
                     },
                   ),
-
                   _isTaskExpanded
                       ? Column(
-                        children: [
-                          ..._tasks.map(
+                    children: [
+                      ..._tasks.map(
                             (task) => ListTile(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) =>
-                                            TaskDetailPage(taskId: task.id),
-                                  ),
-                                );
-                              },
-                              dense: true,
-                              visualDensity: VisualDensity.compact,
-                              contentPadding: EdgeInsets.symmetric(vertical: 4),
-                              leading: SvgPicture.asset(
-                                getTypeIcon(task.type),
-                                width: 18,
-                                height: 18,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TaskDetailPage(taskId: task.id),
                               ),
-                              title: Text(
-                                task.title,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              subtitle: Text(
-                                task.id,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(task.status ?? ''),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  task.status ?? "UNKNOWN",
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                              ),
+                            );
+                          },
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          contentPadding: EdgeInsets.symmetric(vertical: 4),
+                          leading: SvgPicture.asset(
+                            getTypeIcon(task.type),
+                            width: 18,
+                            height: 18,
+                          ),
+                          title: Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-
-                          const SizedBox(height: 8),
-                          OutlinedButton.icon(
-                            onPressed: () => _showCreateTaskSheet(context),
-                            icon: const Icon(Icons.add),
-                            label: const Text("Create task"),
+                          subtitle: Text(
+                            task.id,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ],
-                      )
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _statusColor(task.status ?? ''),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              task.status ?? 'UNKNOWN',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _showCreateTaskSheet(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Create task'),
+                      ),
+                    ],
+                  )
                       : const SizedBox.shrink(),
                 ],
               ),
             ),
-
             buildCard(
-              title: "Assignee",
+              title: 'Assignee',
               child: ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -944,28 +1091,20 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage:
-                      (epicData!.assignedByPicture != null &&
-                              epicData!.assignedByPicture!.isNotEmpty)
-                          ? NetworkImage(epicData!.assignedByPicture!)
-                          : null,
+                  backgroundImage: (epicData!.assignedByPicture != null &&
+                      epicData!.assignedByPicture!.isNotEmpty)
+                      ? NetworkImage(epicData!.assignedByPicture!)
+                      : null,
                   backgroundColor: Colors.blue[100],
-                  child:
-                      (epicData!.assignedByPicture == null ||
-                              epicData!.assignedByPicture!.isEmpty)
-                          ? Text(
-                            (epicData!.assignedByFullname
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          )
-                          : null,
+                  child: (epicData!.assignedByPicture == null || epicData!.assignedByPicture!.isEmpty)
+                      ? Text(
+                    (epicData!.assignedByFullname?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  )
+                      : null,
                 ),
                 title: Text(
                   epicData!.assignedByFullname ?? 'Unassigned',
@@ -973,31 +1112,25 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 ),
               ),
             ),
-
-            // Details card
             buildCard(
-              title: "Details",
+              title: 'Details',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   buildDetailRow(
-                    "Start Date",
-                    epicData!.startDate.toIso8601String().split("T").first ??
-                        'None',
+                    'Start Date',
+                    epicData!.startDate.toIso8601String().split('T').first ?? 'None',
                   ),
                   buildDetailRow(
-                    "End Date",
-                    epicData!.endDate.toIso8601String().split("T").first ??
-                        'None',
+                    'End Date',
+                    epicData!.endDate.toIso8601String().split('T').first ?? 'None',
                   ),
-                  buildDetailRow("Sprint", epicData!.sprintName ?? 'None'),
+                  buildDetailRow('Sprint', epicData!.sprintName ?? 'None'),
                 ],
               ),
             ),
-
-            // Reporter
             buildCard(
-              title: "Reporter",
+              title: 'Reporter',
               child: ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -1007,28 +1140,20 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage:
-                      (epicData!.reporterPicture != null &&
-                              epicData!.reporterPicture!.isNotEmpty)
-                          ? NetworkImage(epicData!.reporterPicture!)
-                          : null,
+                  backgroundImage: (epicData!.reporterPicture != null &&
+                      epicData!.reporterPicture!.isNotEmpty)
+                      ? NetworkImage(epicData!.reporterPicture!)
+                      : null,
                   backgroundColor: Colors.grey[300],
-                  child:
-                      (epicData!.reporterPicture == null ||
-                              epicData!.reporterPicture!.isEmpty)
-                          ? Text(
-                            (epicData!.reporterFullname
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          )
-                          : null,
+                  child: (epicData!.reporterPicture == null || epicData!.reporterPicture!.isEmpty)
+                      ? Text(
+                    (epicData!.reporterFullname?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  )
+                      : null,
                 ),
                 title: Text(
                   epicData!.reporterFullname ?? 'Unassigned',
@@ -1048,7 +1173,7 @@ class _EpicDetailPageState extends State<EpicDetailPage> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(child: Text(value)),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:file_picker/file_picker.dart';
@@ -29,6 +30,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   bool _isAttachmentsExpanded = false;
   List<SubtaskFile> _subtaskFiles = [];
   bool _isLoadingAttachments = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -36,10 +38,27 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
     loadData();
   }
 
+  Future<bool> validateCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    final token = prefs.getString('accessToken') ?? '';
+    if (email.isEmpty || token.isEmpty) {
+      setState(() {
+        _errorMessage = 'Credentials not found in preferences';
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credentials not found in preferences')),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<void> loadData() async {
     await fetchSubtaskDetail();
-    if (subtask != null) {
-      await fetchTaskDetail(subtask!.taskId ?? '');
+    if (subtask != null && subtask!.taskId != null) {
+      await fetchTaskDetail(subtask!.taskId!);
     }
     setState(() {
       isLoading = false;
@@ -47,31 +66,74 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   }
 
   Future<void> fetchTaskDetail(String taskId) async {
-    final uri = UriHelper.build('/task/$taskId');
-
     try {
-      final response = await http.get(uri);
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/task/$taskId');
+
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
         if (data['isSuccess'] == true) {
           setState(() {
             task = Task.fromJson(data['data']);
+            _errorMessage = null;
           });
+        } else {
+          setState(() {
+            _errorMessage = data['message'] ?? 'Failed to load task';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load task: ${data['message'] ?? 'Unknown error'}')),
+          );
         }
       } else {
-        print('Error: ${response.body}');
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${response.statusCode}')),
+        );
       }
     } catch (e) {
-      print('Exception: $e');
+
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: $e')),
+      );
     }
   }
 
   Future<void> fetchSubtaskDetail() async {
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/subtask/${widget.subtaskId}');
-      final response = await http.get(uri);
+
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+      );
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -79,6 +141,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
           setState(() {
             subtask = Subtask.fromJson(jsonBody['data']);
             isLoading = false;
+            _errorMessage = null;
           });
         } else {
           showError(jsonBody['message'] ?? 'Subtask not found');
@@ -92,34 +155,69 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   }
 
   void showError(String message) {
-    setState(() => isLoading = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    setState(() {
+      isLoading = false;
+      _errorMessage = message;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> fetchSubtaskFiles() async {
     setState(() {
       _isLoadingAttachments = true;
+      _errorMessage = null;
     });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final uri = UriHelper.build('/subtaskfile/by-subtask/${widget.subtaskId}');
+
       final response = await http.get(
-        UriHelper.build('/subtaskfile/by-subtask/${widget.subtaskId}'),
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
       );
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         if (jsonData['isSuccess']) {
           final List<SubtaskFile> files =
-              (jsonData['data'] as List)
-                  .map((e) => SubtaskFile.fromJson(e))
-                  .toList();
+          (jsonData['data'] as List).map((e) => SubtaskFile.fromJson(e)).toList();
           setState(() {
             _subtaskFiles = files;
+            _errorMessage = null;
           });
+        } else {
+          setState(() {
+            _errorMessage = jsonData['message'] ?? 'Failed to load subtask files';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load subtask files: ${jsonData['message'] ?? 'Unknown error'}')),
+          );
         }
+      } else {
+        setState(() {
+          _errorMessage = 'Server error: ${response.statusCode}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${response.statusCode}')),
+        );
       }
     } catch (e) {
-      print("Failed to load attachments: $e");
+
+      setState(() {
+        _errorMessage = 'Network error: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Network error: $e')),
+      );
     } finally {
       setState(() {
         _isLoadingAttachments = false;
@@ -128,41 +226,62 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   }
 
   Future<void> _uploadFile() async {
-    // Show dialog to choose between camera, gallery, or file picker
-    final source = await showModalBottomSheet<ImageSource?>(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.camera_alt),
-            title: const Text('Take a Photo'),
-            onTap: () => Navigator.pop(context, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library),
-            title: const Text('Choose from Gallery'),
-            onTap: () => Navigator.pop(context, ImageSource.gallery),
-          ),
-          ListTile(
-            leading: const Icon(Icons.attach_file),
-            title: const Text('Choose a File'),
-            onTap: () => Navigator.pop(context, null), // Use file picker
-          ),
-        ],
-      ),
-    );
-
+    setState(() {
+      _isLoadingAttachments = true;
+      _errorMessage = null;
+    });
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final source = await showModalBottomSheet<ImageSource?>(
+        context: context,
+        builder: (context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_file),
+              title: const Text('Choose a File'),
+              onTap: () => Navigator.pop(context, null),
+            ),
+          ],
+        ),
+      );
+
       PlatformFile? file;
       String? fileName;
 
       if (source != null) {
-        // Use image_picker for camera or gallery
         final ImagePicker _picker = ImagePicker();
         final XFile? image = await _picker.pickImage(source: source);
         if (image == null) {
-          print('No image selected');
+
+          setState(() {
+            _errorMessage = 'No image selected';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No image selected')),
           );
@@ -175,14 +294,16 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         );
         fileName = image.name;
       } else {
-        // Use file_picker for other files
         FilePickerResult? result = await FilePicker.platform.pickFiles(
           type: FileType.any,
           allowMultiple: false,
           withData: true,
         );
         if (result == null || result.files.isEmpty) {
-          print('No file selected');
+
+          setState(() {
+            _errorMessage = 'No file selected';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No file selected')),
           );
@@ -193,62 +314,40 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
       }
 
       if (file.path == null && file.bytes == null) {
-        print('Error: Both file.path and file.bytes are null');
+
+        setState(() {
+          _errorMessage = 'Selected file has no valid path or data';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error: Selected file has no valid path or data')),
         );
         return;
       }
 
-      // Get accountId from SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final accountId = prefs.getInt('accountId');
-      print('Account ID: $accountId');
-
-      if (accountId == null) {
-        print('Error: accountId not found in SharedPreferences');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AccountId not found')),
-        );
-        return;
-      }
-
-      // Prepare the multipart request
       final uri = UriHelper.build('/subtaskfile/upload');
-      print('API URL: $uri');
+
       var request = http.MultipartRequest('POST', uri);
 
-      // Add headers
-      request.headers['accept'] = '*/*';
       request.headers['Content-Type'] = 'multipart/form-data';
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = '*/*';
 
-      // Add authentication token if available
-      final token = prefs.getString('accessToken');
-      if (token != null) {
-        print('Adding Bearer token to headers');
-        request.headers['Authorization'] = 'Bearer $token';
-      } else {
-        print('Warning: No access token found in SharedPreferences');
-      }
-
-      // Add form fields
       request.fields['subtaskId'] = widget.subtaskId;
       request.fields['title'] = fileName;
       request.fields['createdBy'] = accountId.toString();
-      print('Form fields: ${request.fields}');
 
-      // Add the file
+
       if (file.path != null) {
-        print('Using file.path to upload');
+
         request.files.add(
           await http.MultipartFile.fromPath(
-            'file', // Ensure this matches the API's expected field name
+            'file',
             file.path!,
             filename: fileName,
           ),
         );
       } else if (file.bytes != null) {
-        print('Using file.bytes to upload');
+
         request.files.add(
           http.MultipartFile.fromBytes(
             'file',
@@ -258,42 +357,38 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         );
       }
 
-      // Send the request
-      setState(() {
-        _isLoadingAttachments = true;
-      });
-      print('Sending multipart request...');
-
       var response = await request.send();
       var responseBody = await response.stream.bytesToString();
-      print('Response status: ${response.statusCode}');
-      print('Response body: $responseBody');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final jsonResponse = jsonDecode(responseBody);
-        print('Parsed JSON response: $jsonResponse');
-
+        final jsonResponse = json.decode(responseBody);
         if (jsonResponse['isSuccess'] == true ||
             (jsonResponse['urlFile'] != null && jsonResponse['status'] == 'UPLOADED')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('File uploaded successfully')),
           );
-          // Refresh the attachment list
           await fetchSubtaskFiles();
         } else {
-          print('Upload reported as failed: ${jsonResponse['message'] ?? 'Unknown error'}');
+          setState(() {
+            _errorMessage = jsonResponse['message'] ?? 'Upload failed';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Upload failed: ${jsonResponse['message'] ?? 'Unknown error'}')),
           );
         }
       } else {
-        print('Upload failed with status: ${response.statusCode}, reason: ${response.reasonPhrase}');
+        setState(() {
+          _errorMessage = 'Upload failed: ${response.reasonPhrase}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Upload failed: ${response.reasonPhrase}')),
         );
       }
     } catch (e) {
-      print('Error uploading file: $e');
+
+      setState(() {
+        _errorMessage = 'Error uploading file: $e';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error uploading file: $e')),
       );
@@ -305,43 +400,152 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
   }
 
   Future<void> updateSubtaskStatus(String newStatus) async {
-    final prefs = await SharedPreferences.getInstance();
-    final createdBy = prefs.getInt('accountId');
-
-    if (createdBy == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
-
-    final uri = UriHelper.build('/subtask/${widget.subtaskId}/status');
-
-    final payload = {"status": newStatus, "createdBy": createdBy};
-
     try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final createdBy = prefs.getInt('accountId');
+
+      if (createdBy == null) {
+        setState(() {
+          _errorMessage = 'AccountId not found';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/subtask/${widget.subtaskId}/status');
+      final payload = {'status': newStatus, 'createdBy': createdBy};
+
+
       final response = await http.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
         body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200) {
+        final jsonBody = json.decode(response.body);
+        if (jsonBody['isSuccess'] == true) {
+          setState(() {
+            subtask!.status = newStatus;
+            _errorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Status updated successfully')),
+          );
+        } else {
+          setState(() {
+            _errorMessage = jsonBody['message'] ?? 'Update failed';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Update failed: ${jsonBody['message'] ?? 'Unknown error'}')),
+          );
+        }
+      } else {
         setState(() {
-          subtask!.status = newStatus;
+          _errorMessage = 'Server error: ${response.statusCode}';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Update status successfully')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: ${response.body}')),
+          SnackBar(content: Text('Update failed: ${response.statusCode}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+
+      setState(() {
+        _errorMessage = 'Error updating subtask status: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating subtask status: $e')),
+      );
+    }
+  }
+
+  Future<void> updateSubtask({
+    int? assignedBy,
+    String? title,
+    String? description,
+    String? priority,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? reporterId,
+    int? createdBy,
+  }) async {
+    try {
+      if (!await validateCredentials()) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+      final accountId = prefs.getInt('accountId');
+
+      if (accountId == null || subtask == null) {
+        setState(() {
+          _errorMessage = 'Missing account or subtask info';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Missing account or subtask info')),
+        );
+        return;
+      }
+
+      final uri = UriHelper.build('/subtask/${widget.subtaskId}');
+      final payload = {
+        'assignedBy': assignedBy ?? subtask!.assignedBy,
+        'priority': priority ?? subtask!.priority,
+        'title': title ?? subtask!.title,
+        'description': description ?? subtask!.description,
+        'startDate': (startDate ?? subtask!.startDate)?.toIso8601String(),
+        'endDate': (endDate ?? subtask!.endDate)?.toIso8601String(),
+        'reporterId': reporterId ?? subtask!.reporterId,
+        'createdBy': accountId,
+      };
+
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+        },
+        body: jsonEncode(payload),
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['isSuccess']) {
+        setState(() {
+          _errorMessage = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subtask updated successfully')),
+        );
+        await fetchSubtaskDetail();
+      } else {
+        setState(() {
+          _errorMessage = data['message'] ?? 'Failed to update subtask';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update subtask: ${data['message'] ?? response.statusCode}'),
+          ),
+        );
+      }
+    } catch (e) {
+
+      setState(() {
+        _errorMessage = 'Error updating subtask: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating subtask: $e')),
+      );
     }
   }
 
@@ -352,15 +556,15 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            "Select a status",
+            'Select a status',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildStatusOption("TO_DO", Colors.grey, context),
+          _buildStatusOption('TO_DO', Colors.grey, context),
           const Divider(),
-          _buildStatusOption("IN_PROGRESS", Colors.blue, context),
+          _buildStatusOption('IN_PROGRESS', Color(0xFF5BA6E3), context),
           const Divider(),
-          _buildStatusOption("DONE", Colors.green, context),
+          _buildStatusOption('DONE', Color(0xFF78CC7F), context),
         ],
       ),
     );
@@ -434,7 +638,6 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
       color: Colors.white,
       elevation: 0,
       child: InkWell(
-
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -472,70 +675,6 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
     );
   }
 
-  Future<void> updateSubtask({
-    int? assignedBy,
-    String? title,
-    String? description,
-    String? priority,
-    DateTime? startDate,
-    DateTime? endDate,
-    int? reporterId,
-    int? createdBy,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getInt('accountId');
-
-    if (accountId == null || subtask == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Missing account or subtask info')),
-      );
-      return;
-    }
-
-    final uri = UriHelper.build('/subtask/${widget.subtaskId}');
-
-    final payload = {
-      "assignedBy": subtask!.assignedBy,
-      "priority": priority ?? subtask!.priority,
-      "title": title ?? subtask!.title,
-      "description": description ?? subtask!.description,
-      "startDate": (startDate ?? subtask!.startDate)?.toIso8601String(),
-      "endDate": (endDate ?? subtask!.endDate)?.toIso8601String(),
-      "reporterId": subtask!.reporterId,
-      "createdBy": accountId,
-    };
-    print(jsonEncode(payload));
-
-    try {
-      final response = await http.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['isSuccess']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subtask updated successfully')),
-        );
-        await fetchSubtaskDetail(); // Reload to update local state
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to update subtask: ${data["message"] ?? response.body}',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error updating subtask: $e')));
-    }
-  }
-
   final List<String> priorityOptions = [
     'HIGHEST',
     'HIGH',
@@ -551,7 +690,30 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
     }
 
     if (subtask == null) {
-      return const Scaffold(body: Center(child: Text('Subtask not found')));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Subtask not found${_errorMessage != null ? ': $_errorMessage' : ''}',
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isLoading = true;
+                    _errorMessage = null;
+                  });
+                  loadData();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -576,12 +738,20 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
-                    subtask!.title ?? "No title",
+                    subtask!.title ?? 'No title',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -591,26 +761,17 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 18,
-                  backgroundImage:
-                      subtask!.assignedByPicture != null &&
-                              subtask!.assignedByPicture!.isNotEmpty
-                          ? NetworkImage(subtask!.assignedByPicture!)
-                          : null,
+                  backgroundImage: subtask!.assignedByPicture != null &&
+                      subtask!.assignedByPicture!.isNotEmpty
+                      ? NetworkImage(subtask!.assignedByPicture!)
+                      : null,
                   backgroundColor: Colors.blue[100],
-                  // fallback màu nền nếu không có hình
-                  child:
-                      subtask!.assignedByPicture == null ||
-                              subtask!.assignedByPicture!.isEmpty
-                          ? Text(
-                            (subtask!.assignedByName
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(color: Colors.black),
-                          )
-                          : null,
+                  child: subtask!.assignedByPicture == null || subtask!.assignedByPicture!.isEmpty
+                      ? Text(
+                    (subtask!.assignedByName?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(color: Colors.black),
+                  )
+                      : null,
                 ),
               ],
             ),
@@ -644,47 +805,37 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
             buildCard(
-              title: "Description",
+              title: 'Description',
               child: GestureDetector(
                 onTap: () async {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder:
-                          (context) => EditDescriptionPage(
-                            initialDescription: subtask!.description,
-                          ),
+                      builder: (context) => EditDescriptionPage(
+                        initialDescription: subtask!.description,
+                      ),
                     ),
                   );
-
                   if (result != null && result != subtask!.description) {
                     await updateSubtask(description: result);
-
                     setState(() {
                       subtask = subtask!.copyWith(description: result);
+                      _errorMessage = null;
                     });
                   }
                 },
                 child: Text(
-                  subtask!.description?.isNotEmpty == true
-                      ? subtask!.description!
-                      : "Add a description...",
+                  subtask!.description?.isNotEmpty == true ? subtask!.description! : 'Add a description...',
                   style: TextStyle(
-                    color:
-                        subtask!.description?.isNotEmpty == true
-                            ? Colors.black
-                            : Colors.grey,
+                    color: subtask!.description?.isNotEmpty == true ? Colors.black : Colors.grey,
                   ),
                 ),
               ),
             ),
-
             buildCard(
-              title: "Attachments",
+              title: 'Attachments',
               badgeCount: _subtaskFiles.length,
               onTap: () async {
                 setState(() {
@@ -725,8 +876,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       file.title,
@@ -748,15 +898,14 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                   OutlinedButton.icon(
                     onPressed: _uploadFile,
                     icon: const Icon(Icons.add),
-                    label: const Text("Add attachment"),
+                    label: const Text('Add attachment'),
                   ),
                 ],
               )
                   : const SizedBox.shrink(),
             ),
-
             buildCard(
-              title: "Parent Work Item",
+              title: 'Parent Work Item',
               onTap: () {},
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -811,9 +960,8 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 ),
               ),
             ),
-
             buildCard(
-              title: "Assignee",
+              title: 'Assignee',
               child: ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -823,28 +971,20 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage:
-                      subtask!.assignedByPicture != null &&
-                              subtask!.assignedByPicture!.isNotEmpty
-                          ? NetworkImage(subtask!.assignedByPicture!)
-                          : null,
+                  backgroundImage: subtask!.assignedByPicture != null &&
+                      subtask!.assignedByPicture!.isNotEmpty
+                      ? NetworkImage(subtask!.assignedByPicture!)
+                      : null,
                   backgroundColor: Colors.blue[100],
-                  child:
-                      (subtask!.assignedByPicture == null ||
-                              subtask!.assignedByPicture!.isEmpty)
-                          ? Text(
-                            (subtask!.assignedByName
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          )
-                          : null,
+                  child: (subtask!.assignedByPicture == null || subtask!.assignedByPicture!.isEmpty)
+                      ? Text(
+                    (subtask!.assignedByName?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  )
+                      : null,
                 ),
                 title: Text(
                   subtask?.assignedByName ?? 'Unassigned',
@@ -852,36 +992,32 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 ),
               ),
             ),
-
-            // Details
             buildCard(
-              title: "Details",
+              title: 'Details',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   buildDetailRow(
-                    "Priority",
+                    'Priority',
                     subtask?.priority ?? 'None',
                     onTap: () async {
                       final selected = await showDialog<String>(
                         context: context,
                         builder: (BuildContext context) {
                           String? tempPriority = subtask?.priority;
-
                           return AlertDialog(
-                            title: const Text("Edit Priority"),
+                            title: const Text('Edit Priority'),
                             content: StatefulBuilder(
                               builder: (context, setState) {
                                 return DropdownButton<String>(
                                   value: tempPriority,
                                   isExpanded: true,
-                                  items:
-                                      priorityOptions.map((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(value),
-                                        );
-                                      }).toList(),
+                                  items: priorityOptions.map((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    );
+                                  }).toList(),
                                   onChanged: (newValue) {
                                     setState(() {
                                       tempPriority = newValue;
@@ -893,29 +1029,24 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context, null),
-                                child: const Text("Cancel"),
+                                child: const Text('Cancel'),
                               ),
                               TextButton(
-                                onPressed:
-                                    () => Navigator.pop(context, tempPriority),
-                                child: const Text("OK"),
+                                onPressed: () => Navigator.pop(context, tempPriority),
+                                child: const Text('OK'),
                               ),
                             ],
                           );
                         },
                       );
-
                       if (selected != null && selected != subtask?.priority) {
-                        // Gọi API update
                         await updateSubtask(priority: selected);
                       }
                     },
                   ),
-
                   buildDetailRow(
-                    "Start Date",
-                    subtask?.startDate?.toIso8601String().split("T").first ??
-                        'None',
+                    'Start Date',
+                    subtask?.startDate?.toIso8601String().split('T').first ?? 'None',
                     onTap: () async {
                       DateTime? picked = await showDatePicker(
                         context: context,
@@ -924,29 +1055,23 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                         lastDate: DateTime(2100),
                         locale: const Locale('vi', 'VN'),
                       );
-
                       if (picked != null) {
-                        // Tạo DateTime đầy đủ để đảm bảo định dạng chuẩn
-                        final pickedWithHour = DateTime(picked.year, picked.month, picked.day, 12); // 12 giờ trưa an toàn
+                        final pickedWithHour = DateTime(picked.year, picked.month, picked.day, 12);
                         final pickedUtc = pickedWithHour.toUtc();
-
-
                         await updateSubtask(
                           startDate: pickedUtc,
                           endDate: subtask!.endDate,
                         );
-
                         setState(() {
                           subtask = subtask!.copyWith(startDate: pickedUtc);
+                          _errorMessage = null;
                         });
                       }
                     },
                   ),
-
                   buildDetailRow(
-                    "End Date",
-                    subtask?.endDate?.toIso8601String().split("T").first ??
-                        'None',
+                    'End Date',
+                    subtask?.endDate?.toIso8601String().split('T').first ?? 'None',
                     onTap: () async {
                       DateTime? picked = await showDatePicker(
                         context: context,
@@ -955,26 +1080,23 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                         lastDate: DateTime(2100),
                         locale: const Locale('vi', 'VN'),
                       );
-
                       if (picked != null) {
-                        final pickedWithHour = DateTime(picked.year, picked.month, picked.day, 12); // 12 giờ trưa an toàn
+                        final pickedWithHour = DateTime(picked.year, picked.month, picked.day, 12);
                         final pickedUtc = pickedWithHour.toUtc();
-
                         await updateSubtask(endDate: pickedUtc);
-
                         setState(() {
                           subtask = subtask!.copyWith(endDate: pickedUtc);
+                          _errorMessage = null;
                         });
                       }
                     },
                   ),
-
-                  buildDetailRow("Sprint", task?.sprintName ?? 'None'),
+                  buildDetailRow('Sprint', task?.sprintName ?? 'None'),
                 ],
               ),
             ),
             buildCard(
-              title: "Reporter",
+              title: 'Reporter',
               child: ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(
@@ -984,28 +1106,20 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
                 leading: CircleAvatar(
                   radius: 13,
-                  backgroundImage:
-                      subtask!.reporterPicture != null &&
-                              subtask!.reporterPicture!.isNotEmpty
-                          ? NetworkImage(subtask!.reporterPicture!)
-                          : null,
+                  backgroundImage: subtask!.reporterPicture != null &&
+                      subtask!.reporterPicture!.isNotEmpty
+                      ? NetworkImage(subtask!.reporterPicture!)
+                      : null,
                   backgroundColor: Colors.blue[100],
-                  child:
-                      (subtask!.reporterPicture == null ||
-                              subtask!.reporterPicture!.isEmpty)
-                          ? Text(
-                            (subtask!.reporterName
-                                    ?.split(' ')
-                                    .last
-                                    .characters
-                                    .first ??
-                                'U'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          )
-                          : null,
+                  child: (subtask!.reporterPicture == null || subtask!.reporterPicture!.isEmpty)
+                      ? Text(
+                    (subtask!.reporterName?.split(' ').last.characters.first ?? 'U'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  )
+                      : null,
                 ),
                 title: Text(
                   subtask!.reporterName ?? 'Unassigned',
@@ -1029,7 +1143,7 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "$title: ",
+              '$title: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             Expanded(

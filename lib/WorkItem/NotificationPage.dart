@@ -40,37 +40,66 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Future<void> _fetchRecipientNotifications() async {
-    final url = UriHelper.build('/recipientnotification/account/$_accountId');
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
-      final data = decoded['data'] as List;
-      setState(() {
-        _recipientNotifications =
-            data.map((json) => RecipientNotification.fromJson(json)).toList();
-      });
-      final unread = _recipientNotifications.where((n) => !n.isRead).length;
-      if (widget.onUnreadCountChanged != null) {
-        widget.onUnreadCountChanged!(unread);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
+      final url = UriHelper.build('/recipientnotification/account/$_accountId');
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded['data'] as List;
+        setState(() {
+          _recipientNotifications =
+              data.map((json) => RecipientNotification.fromJson(json)).toList();
+        });
+
+        final unread = _recipientNotifications.where((n) => !n.isRead).length;
+        if (widget.onUnreadCountChanged != null) {
+          widget.onUnreadCountChanged!(unread);
+        }
+      } else {
+        print('Failed to load recipient notifications: ${response.statusCode}');
       }
-    } else {
-      print('Failed to load recipient notifications');
+    } catch (e) {
+      print('Error fetching recipient notifications: $e');
     }
   }
 
   Future<void> _fetchNotifications() async {
-    final url = UriHelper.build('/notification');
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
-      final data = decoded['data'] as List;
-      setState(() {
-        _notifications =
-            data.map((json) => NotificationModel.fromJson(json)).toList();
-        _isLoading = false;
-      });
-    } else {
-      print('Failed to load notifications');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
+      final url = UriHelper.build('/notification');
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded['data'] as List;
+        setState(() {
+          _notifications =
+              data.map((json) => NotificationModel.fromJson(json)).toList();
+          _isLoading = false;
+        });
+      } else {
+        print('Failed to load notifications: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
     }
   }
 
@@ -93,14 +122,26 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Future<void> _markAsRead(int notificationId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
     final url = UriHelper.build(
         '/recipientnotification/mark-as-read?accountId=$_accountId&notificationId=$notificationId');
-    final response = await http.put(url);
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': '*/*',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
     if (response.statusCode == 200) {
       await _fetchRecipientNotifications();
       setState(() {});
     } else {
-      print('Failed to mark as read');
+      print('Failed to mark as read: ${response.statusCode}');
     }
   }
 

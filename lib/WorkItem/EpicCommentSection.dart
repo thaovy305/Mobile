@@ -15,10 +15,10 @@ class EpicCommentSection extends StatefulWidget {
   const EpicCommentSection({super.key, required this.epicId});
 
   @override
-  State<EpicCommentSection> createState() => _EpicCommentSectionState();
+  State<EpicCommentSection> createState() => EpicCommentSectionState();
 }
 
-class _EpicCommentSectionState extends State<EpicCommentSection> {
+class EpicCommentSectionState extends State<EpicCommentSection> {
   String selectedActivity = 'Comments';
   List<EpicComment> comments = [];
   List<String> activities = ['Comments', 'History'];
@@ -37,134 +37,175 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
     super.initState();
     fetchComments();
     fetchCurrentUserId();
-    fetchActivityLogs();
     fetchEpicDetail();
   }
 
   Future<void> fetchComments() async {
-    final url = UriHelper.build('/epiccomment/by-epic/${widget.epicId}');
-    final response = await http.get(url, headers: {'accept': '*/*'});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonMap = jsonDecode(response.body);
-      final List<dynamic> dataList = jsonMap['data'];
+      final url = UriHelper.build('/epiccomment/by-epic/${widget.epicId}');
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-      setState(() {
-        comments = dataList.map((e) => EpicComment.fromJson(e)).toList();
-        comments.sort((a, b) {
-          final aDate = DateTime.parse(a.createdAt);
-          final bDate = DateTime.parse(b.createdAt);
-          return isOldestFirst
-              ? aDate.compareTo(bDate)
-              : bDate.compareTo(aDate);
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = jsonDecode(response.body);
+        final List<dynamic> dataList = jsonMap['data'];
+
+        setState(() {
+          comments = dataList.map((e) => EpicComment.fromJson(e)).toList();
+          comments.sort((a, b) {
+            final aDate = DateTime.parse(a.createdAt);
+            final bDate = DateTime.parse(b.createdAt);
+            return isOldestFirst
+                ? aDate.compareTo(bDate)
+                : bDate.compareTo(aDate);
+          });
         });
-      });
-    } else {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('Failed to fetch comment: ${response.statusCode}'),
-      //   ),
-      // );
+      } else {
+        print("Failed to fetch comment: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error fetching comments: $e");
     }
   }
 
   Future<void> _createCommentEpic(String content) async {
-    final prefs = await SharedPreferences.getInstance();
-    final createdBy = prefs.getInt('accountId');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final createdBy = prefs.getInt('accountId');
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (createdBy == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
+      if (createdBy == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
 
-    final url = UriHelper.build('/epiccomment');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
-      body: jsonEncode({
-        "epicId": widget.epicId,
-        "accountId": createdBy,
-        "content": content,
-        "createdBy": createdBy,
-      }),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      commentInput = '';
-      print("Created successfully");
-      await fetchComments();
-      await fetchActivityLogs();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Comment failed: ${response.statusCode}'),
-        ),
+      final url = UriHelper.build('/epiccomment');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "epicId": widget.epicId,
+          "accountId": createdBy,
+          "content": content,
+          "createdBy": createdBy,
+        }),
       );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        commentInput = '';
+        print("Created successfully");
+        await fetchComments();
+        await fetchActivityLogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Comment failed: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      print("Error creating comment: $e");
     }
   }
 
   Future<void> deleteComment(int commentId, int createdBy) async {
-    final uri = UriHelper.build('/epiccomment/$commentId');
-    final response = await http.delete(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'createdBy': createdBy}),
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body);
-      if (json['isSuccess'] == true) {
-        print("Delete successfully");
-        await fetchComments();
-        await fetchActivityLogs();
+      final uri = UriHelper.build('/epiccomment/$commentId');
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'createdBy': createdBy}),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json['isSuccess'] == true) {
+          print("Delete successfully");
+          await fetchComments();
+          await fetchActivityLogs();
+        } else {
+          print("Delete failed: ${json['message']}");
+        }
       } else {
-        print("Delete failed: ${json['message']}");
+        print("Error: ${response.statusCode}");
       }
-    } else {
-      print("Error: ${response.statusCode}");
+    } catch (e) {
+      print("Error deleting comment: $e");
     }
   }
 
   Future<void> updateComment(int commentId, String updatedContent) async {
-    final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getInt('accountId');
-    if (accountId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final accountId = prefs.getInt('accountId');
+      final token = prefs.getString('accessToken') ?? '';
+      if (accountId == null) return;
 
-    final comment = comments.firstWhere(
-          (c) => c.id == commentId,
-    );
+      final comment = comments.firstWhere((c) => c.id == commentId);
 
-    final response = await http.put(
-      UriHelper.build('/epiccomment/$commentId'),
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
-      body: jsonEncode({
-        "epicId": comment.epicId,
-        "accountId": accountId,
-        "content": updatedContent,
-        "createdBy": accountId,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Updated comment')));
-      await fetchComments();
-      await fetchActivityLogs();
-
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Updated error: ${response.statusCode}')),
+      final response = await http.put(
+        UriHelper.build('/epiccomment/$commentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "epicId": comment.epicId,
+          "accountId": accountId,
+          "content": updatedContent,
+          "createdBy": accountId,
+        }),
       );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Updated comment')),
+        );
+        await fetchComments();
+        await fetchActivityLogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated error: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      print("Error updating comment: $e");
     }
   }
 
   Future<void> fetchEpicDetail() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
       final uri = UriHelper.build('/epic/${widget.epicId}');
-      final response = await http.get(uri);
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -190,24 +231,25 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
     }
   }
 
-  void showError(String message) {
-    setState(() {
-      isLoading = false;
-    });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<void> fetchActivityLogs() async {
     if (epicData?.projectId == null) {
       print("projectId is null, cannot fetch logs.");
       return;
     }
 
-    final uri = UriHelper.build('/activitylog/epic/${epicData!.id}');
     try {
-      final response = await http.get(uri);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
+      final uri = UriHelper.build('/activitylog/epic/${epicData!.id}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         final List<dynamic> data = jsonData['data'];
@@ -227,6 +269,15 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
     setState(() {
       currentUserId = prefs.getInt('accountId');
     });
+  }
+
+  void showError(String message) {
+    setState(() {
+      isLoading = false;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -470,6 +521,8 @@ class _EpicCommentSectionState extends State<EpicCommentSection> {
                                           comment.id,
                                           currentUserId!,
                                         );
+                                        await fetchComments();
+                                        await fetchActivityLogs();
                                       }
                                     },
                                     icon: const Icon(

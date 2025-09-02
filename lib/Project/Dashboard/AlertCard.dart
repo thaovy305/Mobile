@@ -133,17 +133,17 @@ class AlertCard extends StatelessWidget {
               const Text('• Schedule Performance Index (SPI) is below 1.'),
             if (isCPIBad)
               const Text('• Cost Performance Index (CPI) is below 1.'),
-            const Text('• Please review suggested actions from AI below.'),
+            //const Text('• Please review suggested actions from AI below.'),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isRecLoading ? null : onShowAIRecommendations,
-              child: const Text('Show AI Recommendations'),
-            ),
-            if (isRecLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 8.0),
-                child: CircularProgressIndicator(),
-              ),
+            // ElevatedButton(
+            //   onPressed: isRecLoading ? null : onShowAIRecommendations,
+            //   child: const Text('Show AI Recommendations'),
+            // ),
+            // if (isRecLoading)
+            //   const Padding(
+            //     padding: EdgeInsets.only(top: 8.0),
+            //     child: CircularProgressIndicator(),
+            //   ),
           ],
         ),
       ),

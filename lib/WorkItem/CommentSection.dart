@@ -14,10 +14,10 @@ class CommentSection extends StatefulWidget {
   const CommentSection({super.key, required this.taskId});
 
   @override
-  State<CommentSection> createState() => _CommentSectionState();
+  State<CommentSection> createState() => CommentSectionState();
 }
 
-class _CommentSectionState extends State<CommentSection> {
+class CommentSectionState extends State<CommentSection> {
   String selectedActivity = 'Comments';
   List<TaskComment> comments = [];
   List<String> activities = ['Comments', 'History'];
@@ -38,126 +38,185 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Future<void> fetchComments() async {
-    final url = UriHelper.build('/taskcomment/by-task/${widget.taskId}');
-    final response = await http.get(url, headers: {'accept': '*/*'});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonMap = jsonDecode(response.body);
-      final List<dynamic> dataList = jsonMap['data'];
+      final url = UriHelper.build('/taskcomment/by-task/${widget.taskId}');
+      final response = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-      setState(() {
-        comments = dataList.map((e) => TaskComment.fromJson(e)).toList();
-        comments.sort((a, b) {
-          final aDate = DateTime.parse(a.createdAt);
-          final bDate = DateTime.parse(b.createdAt);
-          return isOldestFirst
-              ? aDate.compareTo(bDate)
-              : bDate.compareTo(aDate);
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonMap = jsonDecode(response.body);
+        final List<dynamic> dataList = jsonMap['data'];
+
+        setState(() {
+          comments = dataList.map((e) => TaskComment.fromJson(e)).toList();
+          comments.sort((a, b) {
+            final aDate = DateTime.parse(a.createdAt);
+            final bDate = DateTime.parse(b.createdAt);
+            return isOldestFirst
+                ? aDate.compareTo(bDate)
+                : bDate.compareTo(aDate);
+          });
         });
-      });
-    } else {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('Failed to fetch comment: ${response.statusCode}'),
-      //   ),
-      // );
+      } else {
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Text('Failed to fetch comment: ${response.statusCode}'),
+        //   ),
+        // );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching comments: $e')),
+      );
     }
   }
 
   Future<void> _createCommentTask(String content) async {
-    final prefs = await SharedPreferences.getInstance();
-    final createdBy = prefs.getInt('accountId');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final createdBy = prefs.getInt('accountId');
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (createdBy == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('AccountId not found')));
-      return;
-    }
+      if (createdBy == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AccountId not found')),
+        );
+        return;
+      }
 
-    final url = UriHelper.build('/taskcomment');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
-      body: jsonEncode({
-        "taskId": widget.taskId,
-        "accountId": createdBy,
-        "content": content,
-        "createdBy": createdBy,
-      }),
-    );
+      final url = UriHelper.build('/taskcomment');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "taskId": widget.taskId,
+          "accountId": createdBy,
+          "content": content,
+          "createdBy": createdBy,
+        }),
+      );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      commentInput = '';
-      print("Created successfully");
-      await fetchComments();
-      await fetchActivityLogs();
-    } else {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        commentInput = '';
+        print("Created successfully");
+        await fetchComments();
+        await fetchActivityLogs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Comment failed: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Comment failed: ${response.statusCode}')),
+        SnackBar(content: Text('Error creating comment: $e')),
       );
     }
   }
 
   Future<void> deleteComment(int commentId, int createdBy) async {
-    final uri = UriHelper.build('/taskcomment/$commentId');
-    final response = await http.delete(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'createdBy': createdBy}),
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
 
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body);
-      if (json['isSuccess'] == true) {
-        print("Delete successfully");
-        await fetchComments();
-        await fetchActivityLogs();
+      final uri = UriHelper.build('/taskcomment/$commentId');
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'createdBy': createdBy}),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delete successfully')),
+        );
+        final json = jsonDecode(response.body);
+        if (json['isSuccess'] == true) {
+          print("Delete successfully");
+          await fetchComments();
+          await fetchActivityLogs();
+        } else {
+          print("Delete failed: ${json['message']}");
+        }
       } else {
-        print("Delete failed: ${json['message']}");
+        print("Error: ${response.statusCode}");
       }
-    } else {
-      print("Error: ${response.statusCode}");
+    } catch (e) {
+      print("Error deleting comment: $e");
     }
   }
 
   Future<void> updateComment(int commentId, String updatedContent) async {
-    final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getInt('accountId');
-    if (accountId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final accountId = prefs.getInt('accountId');
+      final token = prefs.getString('accessToken') ?? '';
+      if (accountId == null) return;
 
-    final comment = comments.firstWhere(
-      (c) => c.id == commentId,
-    ); // lấy taskId cũ
+      final comment = comments.firstWhere((c) => c.id == commentId);
 
-    final response = await http.put(
-      UriHelper.build('/taskcomment/$commentId'),
-      headers: {'Content-Type': 'application/json', 'accept': '*/*'},
-      body: jsonEncode({
-        "taskId": comment.taskId,
-        "accountId": accountId,
-        "content": updatedContent,
-        "createdBy": accountId,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Updated comment')));
-      await fetchComments();
-      await fetchActivityLogs();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Updated error: ${response.statusCode}')),
+      final response = await http.put(
+        UriHelper.build('/taskcomment/$commentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "taskId": comment.taskId,
+          "accountId": accountId,
+          "content": updatedContent,
+          "createdBy": accountId,
+        }),
       );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Updated comment')),
+        );
+        await fetchComments();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await fetchActivityLogs();
+
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated error: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      print("Error updating comment: $e");
     }
   }
 
   Future<void> fetchActivityLogs() async {
-    final uri = UriHelper.build('/activitylog/task/${widget.taskId}');
     try {
-      final response = await http.get(uri);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
+      final uri = UriHelper.build('/activitylog/task/${widget.taskId}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': '*/*',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         final List<dynamic> data = jsonData['data'];
@@ -423,6 +482,8 @@ class _CommentSectionState extends State<CommentSection> {
                                               comment.id,
                                               currentUserId!,
                                             );
+                                            await fetchComments();
+                                            await fetchActivityLogs();
                                           }
                                         },
                                         icon: const Icon(

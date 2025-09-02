@@ -95,7 +95,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
         },
       );
 
-
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
         if (jsonBody['isSuccess'] == true && jsonBody['data'] != null) {
@@ -108,7 +107,7 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           showError(jsonBody['message'] ?? 'No subtask data');
         }
       } else {
-        showError('Server error: ${response.statusCode}');
+        showError('There are no subtask in this task');
       }
     } catch (e) {
       showError('Network error: $e');
@@ -131,7 +130,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           'Accept': '*/*',
         },
       );
-
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(response.body);
@@ -589,7 +587,6 @@ class _TaskDetailPage extends State<TaskDetailPage> {
           'Accept': '*/*',
         },
       );
-
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);

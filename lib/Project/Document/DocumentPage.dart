@@ -646,8 +646,17 @@ class _DocumentPageState extends State<DocumentPage> with SingleTickerProviderSt
 
   Future<int?> _getProjectIdFromKey(String projectKey) async {
     final url = UriHelper.build('/project/by-project-key?projectKey=$projectKey');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken') ?? '';
     try {
-      final res = await http.get(url, headers: {'accept': '*/*'});
+      final res = await http.get(
+        url,
+        headers: {
+          'accept': '*/*',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
       if (res.statusCode == 200) return jsonDecode(res.body)['data']['id'];
     } catch (e) {
       print('Connection error: $e');

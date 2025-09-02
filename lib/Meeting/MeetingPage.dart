@@ -39,45 +39,45 @@
 //     }
 
 //     final List<dynamic> meetingsJson = json.decode(meetingRes.body);
-//     List<Meeting> meetings = [];
 
-//     for (var jsonMeeting in meetingsJson) {
-//       int meetingId = jsonMeeting['id'];
-//       String participantStatus = 'Not Registered';
+//     final meetings = await Future.wait(
+//       meetingsJson.map((jsonMeeting) async {
+//         int meetingId = jsonMeeting['id'];
+//         String participantStatus = 'Not Registered';
 
-//       try {
-//         final participantRes = await http.get(
-//           UriHelper.build('/meeting-participants/meeting/$meetingId'),
-//         );
-
-//         if (participantRes.statusCode == 200) {
-//           final List<dynamic> participants = json.decode(participantRes.body);
-//           final participant = participants.firstWhere(
-//             (p) => p['accountId'] == accountId,
-//             orElse: () => null,
+//         try {
+//           final participantRes = await http.get(
+//             UriHelper.build('/meeting-participants/meeting/$meetingId'),
 //           );
 
-//           if (participant != null) {
-//             participantStatus = participant['status'] ?? 'Unknown';
-//           }
-//         }
-//       } catch (_) {
-//         participantStatus = 'Unknown';
-//       }
+//           if (participantRes.statusCode == 200) {
+//             final List<dynamic> participants = json.decode(participantRes.body);
+//             final participant = participants.firstWhere(
+//               (p) => p['accountId'] == accountId,
+//               orElse: () => null,
+//             );
 
-//       meetings.add(Meeting.fromJson(jsonMeeting, participantStatus));
-//     }
+//             if (participant != null) {
+//               participantStatus = participant['status'] ?? 'Unknown';
+//             }
+//           }
+//         } catch (_) {
+//           participantStatus = 'Unknown';
+//         }
+
+//         return Meeting.fromJson(jsonMeeting, participantStatus);
+//       }),
+//     );
 
 //     return meetings;
 //   }
 
-//   // 🎯 Gọi hàm này khi push sang trang tạo mới
 //   Future<void> _navigateAndReload(Widget page) async {
 //     await Navigator.push(
 //       context,
 //       MaterialPageRoute(builder: (context) => page),
 //     );
-//     _loadAndSetMeetings(); // ⬅️ Tải lại dữ liệu sau khi trở lại
+//     _loadAndSetMeetings();
 //   }
 
 //   @override
@@ -105,14 +105,15 @@
 //   }
 // }
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../Models/MeetingModel.dart';
 import '../Meeting/WeeklyMeetingCalendar.dart';
-import '../Helper/UriHelper.dart';
+import '../Meeting/MeetingService.dart';
 
 class MeetingPage extends StatefulWidget {
+  const MeetingPage({super.key});
+
   @override
   State<MeetingPage> createState() => _MeetingPageState();
 }
@@ -123,10 +124,10 @@ class _MeetingPageState extends State<MeetingPage> {
   @override
   void initState() {
     super.initState();
-    _loadAndSetMeetings();
+    _reloadMeetings();
   }
 
-  void _loadAndSetMeetings() {
+  Future<void> _reloadMeetings() async {
     setState(() {
       _futureMeetings = _loadMeetings();
     });
@@ -136,54 +137,20 @@ class _MeetingPageState extends State<MeetingPage> {
     final prefs = await SharedPreferences.getInstance();
     final accountId = prefs.getInt('accountId') ?? 2;
 
-    final meetingRes = await http.get(
-      UriHelper.build('/meetings/account/$accountId/schedule'),
-    );
+    final list = await fetchMeetings(accountId);
 
-    if (meetingRes.statusCode != 200) {
-      throw Exception('Failed to load meetings');
-    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-    final List<dynamic> meetingsJson = json.decode(meetingRes.body);
+    return list.where((m) {
+      final ms = (m.status ?? '').toUpperCase();
+      if (ms == 'CANCELLED') return false;
 
-    final meetings = await Future.wait(
-      meetingsJson.map((jsonMeeting) async {
-        int meetingId = jsonMeeting['id'];
-        String participantStatus = 'Not Registered';
-
-        try {
-          final participantRes = await http.get(
-            UriHelper.build('/meeting-participants/meeting/$meetingId'),
-          );
-
-          if (participantRes.statusCode == 200) {
-            final List<dynamic> participants = json.decode(participantRes.body);
-            final participant = participants.firstWhere(
-              (p) => p['accountId'] == accountId,
-              orElse: () => null,
-            );
-
-            if (participant != null) {
-              participantStatus = participant['status'] ?? 'Unknown';
-            }
-          }
-        } catch (_) {
-          participantStatus = 'Unknown';
-        }
-
-        return Meeting.fromJson(jsonMeeting, participantStatus);
-      }),
-    );
-
-    return meetings;
-  }
-
-  Future<void> _navigateAndReload(Widget page) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-    );
-    _loadAndSetMeetings();
+      final end = m.endTime;
+      final meetingDay = DateTime(end.year, end.month, end.day);
+      final isActiveOutdated = (ms == 'ACTIVE') && meetingDay.isBefore(today);
+      return !isActiveOutdated;
+    }).toList();
   }
 
   @override
@@ -192,18 +159,32 @@ class _MeetingPageState extends State<MeetingPage> {
       appBar: AppBar(
         title: const Text('Meeting Schedule'),
         actions: [
-          IconButton(icon: Icon(Icons.refresh), onPressed: _loadAndSetMeetings),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _reloadMeetings,
+            tooltip: 'Reload',
+          ),
         ],
       ),
       body: FutureBuilder<List<Meeting>>(
         future: _futureMeetings,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: TextStyle(color: Colors.red),
+              ),
+            );
+          }
 
-          final meetings = snapshot.data!;
+          final meetings = snapshot.data ?? [];
+          if (meetings.isEmpty) {
+            return const Center(child: Text('No meetings found'));
+          }
           return WeeklyMeetingCalendar(meetings: meetings);
         },
       ),

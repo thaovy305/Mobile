@@ -38,16 +38,16 @@ class _ProjectOverviewPageState extends State<ProjectOverviewPage> {
     "Board",
     "Dashboard",
     "Risk",
-    "Summary",
-    "Calendar",
+    //"Summary",
+    //"Calendar",
     // slot Documents | Reports sẽ chèn ở đây
-    "Timeline",
-    "Reports",
+    //"Timeline",
+   // "Reports",
   ];
 
   List<String> get _tabs {
     final tabs = List<String>.from(_baseTabs);
-    final insertIndex = 6; // sau "Calendar"
+    final insertIndex = 4; // sau "Calendar"
     tabs.insert(insertIndex, _isClient ? "Document Report" : "Documents");
     return tabs;
   }

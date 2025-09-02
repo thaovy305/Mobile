@@ -57,6 +57,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginPage(),
         '/main': (context) => MainScreen(),
       },
+      debugShowCheckedModeBanner: false,
     );
   }
 }

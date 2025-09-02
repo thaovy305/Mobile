@@ -86,7 +86,7 @@ class _WorkItemListState extends State<WorkItemList> {
         }
       } else {
         setState(() {
-          errorMessage = 'Server error: ${response.statusCode}';
+          errorMessage = 'No task';
           isLoading = false;
         });
       }

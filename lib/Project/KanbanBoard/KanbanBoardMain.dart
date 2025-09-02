@@ -46,6 +46,8 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       setState(() {
         errorMessage = 'Credentials not found in preferences';
         isLoadingPerStatus.clear();
+        taskStatuses = [];
+        tasksByStatus = {};
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Credentials not found in preferences')),
@@ -90,16 +92,21 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       if (sprintResponse.statusCode != 200 || json.decode(sprintResponse.body)['isSuccess'] != true) {
         setState(() {
           errorMessage = 'No active sprint found';
+          taskStatuses = [];
+          tasksByStatus = {};
           if (statusName != null) isLoadingPerStatus[statusName] = false;
         });
         return;
       }
+
       final sprintData = json.decode(sprintResponse.body)['data'];
       final sprintId = sprintData['id'] as int?;
 
       if (sprintId == null) {
         setState(() {
           errorMessage = 'No active sprint found';
+          taskStatuses = [];
+          tasksByStatus = {};
           if (statusName != null) isLoadingPerStatus[statusName] = false;
         });
         return;
@@ -117,8 +124,15 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       );
 
       if (statusResponse.statusCode != 200 || json.decode(statusResponse.body)['isSuccess'] != true) {
-        throw Exception('Failed to load task statuses');
+        setState(() {
+          errorMessage = 'Failed to load task statuses';
+          taskStatuses = [];
+          tasksByStatus = {};
+          if (statusName != null) isLoadingPerStatus[statusName] = false;
+        });
+        return;
       }
+
       final statusData = json.decode(statusResponse.body)['data'] as List;
 
       Map<String, List<Task>> tasksByStatusTemp = {};
@@ -154,6 +168,8 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
     } catch (e) {
       setState(() {
         errorMessage = 'Error: $e';
+        taskStatuses = [];
+        tasksByStatus = {};
         if (statusName != null) isLoadingPerStatus[statusName] = false;
       });
     }
@@ -165,7 +181,7 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('accessToken') ?? '';
-      final userId = prefs.getInt('userId') ?? 1; // Fallback to 1 if userId is not stored
+      final userId = prefs.getInt('userId') ?? 1;
       final uri = UriHelper.build('/task/$taskId/status');
 
       final response = await http.patch(
@@ -184,13 +200,11 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
       if (response.statusCode == 200 && json.decode(response.body)['isSuccess'] == true) {
         await _fetchDataForStatus(newStatus);
       } else {
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update task status: ${response.statusCode}')),
         );
       }
     } catch (e) {
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating task status: $e')),
       );
@@ -206,8 +220,6 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
     final visibleWidth = screenWidth * 0.85;
     final currentOffset = _pageController.offset;
     const scrollSpeed = 100.0;
-
-
 
     if (localPosition > visibleWidth * 0.9 && currentOffset < (taskStatuses.length - 1) * visibleWidth) {
       _pageController.jumpTo(currentOffset + scrollSpeed);
@@ -228,15 +240,18 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
 
   @override
   Widget build(BuildContext context) {
-    if (taskStatuses.isEmpty && errorMessage == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
     if (errorMessage != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Error: $errorMessage', style: const TextStyle(color: Colors.red)),
+            Text(
+              errorMessage == 'No active sprint found'
+                  ? 'No active sprint found.\nPlease start a new sprint.'
+                  : 'Error: $errorMessage',
+              style: const TextStyle(color: Colors.black38, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchInitialData,
@@ -245,6 +260,10 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
           ],
         ),
       );
+    }
+
+    if (taskStatuses.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     final columns = taskStatuses.map((status) {
@@ -258,10 +277,6 @@ class _KanbanBoardMainState extends State<KanbanBoardMain> {
         isLoading: isLoadingPerStatus[statusName] ?? false,
       );
     }).toList();
-
-    if (columns.isEmpty) {
-      return const Center(child: Text('No task statuses available'));
-    }
 
     return PageView.builder(
       controller: _pageController,

@@ -52,6 +52,8 @@ class _WorkItemDetailedState extends State<WorkItemDetailed> {
     });
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
       final uri = UriHelper.build('/account/$accountId/workitem');
       print('Fetching work items from: $uri');
       final response = await http.get(
@@ -59,6 +61,7 @@ class _WorkItemDetailedState extends State<WorkItemDetailed> {
         headers: {
           'Content-Type': 'application/json',
           'Accept': '*/*',
+          'Authorization': 'Bearer $token',
         },
       );
       print('Response status: ${response.statusCode}, body: ${response.body}');
@@ -86,7 +89,7 @@ class _WorkItemDetailedState extends State<WorkItemDetailed> {
         }
       } else {
         setState(() {
-          errorMessage = 'Server error: ${response.statusCode}';
+          errorMessage = 'No task';
           isLoading = false;
         });
       }
